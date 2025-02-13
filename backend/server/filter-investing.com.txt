@@ -1,0 +1,475 @@
+
+<input type="hidden" name="dateFrom" id="dateFrom" value="2024-10-04">
+<input type="hidden" name="dateTo" id="dateTo" value="2024-10-04">
+<input type="hidden" name="timeframe" id="timeframe" value="">
+<div class="buttonLine">
+<div id="economicCalendarFilters" class="buttonLine ecoButtonLine">
+<a href="javascript:void(0);" id="filterStateAnchor" class="newBtn filter LightGray float_lang_base_2">Filters<span class="filtersOnLight" id="filterStateButton"></span></a>
+<div class="float_lang_base_1 js-tabs-economic">
+<a href="javascript:void(0);" id="timeFrame_yesterday" data-identifier="" class="newBtn toggleButton LightGray first">Yesterday</a><a href="javascript:void(0);" id="timeFrame_today" data-identifier="" class="newBtn toggleButton LightGray toggled">Today</a><a href="javascript:void(0);" id="timeFrame_tomorrow" data-identifier="" class="newBtn toggleButton LightGray">Tomorrow</a><a href="javascript:void(0);" id="timeFrame_thisWeek" data-identifier="" class="newBtn toggleButton LightGray">This Week</a><a href="javascript:void(0);" id="timeFrame_nextWeek" data-identifier="" class="newBtn toggleButton LightGray">Next Week</a><a href="javascript:void(0);" id="datePickerToggleBtn" data-identifier="" class="newBtn toggleButton LightGray datePickerBtn noText datePickerIconWrap">&nbsp;&nbsp;</a> </div>
+<div id="flatDatePickerCanvasHol" class="datePickerWrap calendarDatePicker iconOnly float_lang_base_1 CalHideDatePicker">
+<div class="float_lang_base_2" id="widget">
+<div id="widgetField" class="dateField inlineblock">
+<div id="widgetFieldDateRange" class="dateRange inlineblock datePickerBinder arial_11 lightgrayFont">10/04/2024 - 10/04/2024</div>
+</div>
+<input type="hidden" id="picker" value="10/04/2024 - 10/04/2024" class="hasDatepicker">
+<div id="widgetFieldBottomBorder" class="widgetFieldBottomBorder"></div>
+<div class="calendarWidget" id="widgetHolCalendar"></div>
+</div>
+<div id="datePickerIconWrap" class="datePickerIconWrap"><span class="datePickerIcon">&nbsp;</span></div>
+</div>
+<div class="clear"></div>
+</div>
+<div id="filtersWrapper" class="displayNone ">
+<div id="filtersArrowIndicator" class="arrowIndicator"></div>
+<div id="SearchBox" class="ecoSearchBox align_center ">
+<span onclick="changeFiltersVisibility();" class="float_lang_base_2 bugCloseIcon">&nbsp;</span>
+<div class="searchTitle inlineblock arial_14 bold">Search:&nbsp;</div>
+<div id="calendarFilterSearchTextContainer" class="searchDiv combineSearchBox newInput inputTextBox inlineblock">
+<div id="searchBoxTop" class="inlineblock">
+<input type="text" autocomplete="off" name="quotes_search_text" id="calendarFilterSearchText" class="searchText alignTop" placeholder="Event Name" value="">
+</div><div id="search_0bottom" class="inlineblock combineSearchOption combineSearchOptionSelected alignTop">
+<label for="calendarFilterSearchText" class="searchGlassIcon">&nbsp;</label>
+<i class="cssSpinner"></i>
+</div>
+<div id="economicCalendarSearchPopupResults" class="eventSearchPopupResults economicCalendarSearchPopupResults text_align_lang_base_1 dirSearchResults calendarFilterSearchResults displayNone">
+</div>
+</div>
+<script>
+	$(document).ready(function () {
+		window.searchFilterCalendars.economic = initSearchWidget({
+			calendarType: 'economic',
+			url: '/economic-calendar/search-auto-complete?filterSpeeches=',
+			functionName: 'searchValue'
+		});
+	});
+</script> <div class="displayNone" id="doc_direconomicCalendarSearchPopupResults">ltr</div>
+<div class="displayNone" id="total_resultseconomicCalendarSearchPopupResults">0</div>
+</div>
+<div id="calendarFilterBox_country" class="ecoFilterBox">
+<div class="left float_lang_base_1">
+<p class="arial_14 bold">Country:</p>
+<a href="javascript:void(0);" onclick="selectAll('country[]');">Select All</a><br>
+<a href="javascript:void(0);" onclick="clearAll('country[]');">Clear</a>
+</div>
+<div class="right float_lang_base_2">
+<ul class="countryOption">
+<li><input id="country95" name="country[]" type="checkbox" value="95"><span class="ceFlags Albania">&nbsp;</span><label for="country95">Albania</label></li>
+<li><input id="country86" name="country[]" type="checkbox" value="86"><span class="ceFlags Angola">&nbsp;</span><label for="country86">Angola</label></li>
+<li><input id="country29" name="country[]" type="checkbox" value="29"><span class="ceFlags Argentina">&nbsp;</span><label for="country29">Argentina</label></li>
+<li><input id="country25" name="country[]" type="checkbox" value="25" checked="checked"><span class="ceFlags Australia">&nbsp;</span><label for="country25">Australia</label></li>
+<li><input id="country54" name="country[]" type="checkbox" value="54"><span class="ceFlags Austria">&nbsp;</span><label for="country54">Austria</label></li>
+<li><input id="country114" name="country[]" type="checkbox" value="114"><span class="ceFlags Azerbaijan">&nbsp;</span><label for="country114">Azerbaijan</label></li>
+<li><input id="country145" name="country[]" type="checkbox" value="145"><span class="ceFlags Bahrain">&nbsp;</span><label for="country145">Bahrain</label></li>
+<li><input id="country47" name="country[]" type="checkbox" value="47"><span class="ceFlags Bangladesh">&nbsp;</span><label for="country47">Bangladesh</label></li>
+<li><input id="country34" name="country[]" type="checkbox" value="34"><span class="ceFlags Belgium">&nbsp;</span><label for="country34">Belgium</label></li>
+<li><input id="country174" name="country[]" type="checkbox" value="174"><span class="ceFlags Bosnia">&nbsp;</span><label for="country174">Bosnia-Herzegovina</label></li>
+<li><input id="country163" name="country[]" type="checkbox" value="163"><span class="ceFlags Botswana">&nbsp;</span><label for="country163">Botswana</label></li>
+<li><input id="country32" name="country[]" type="checkbox" value="32" checked="checked"><span class="ceFlags Brazil">&nbsp;</span><label for="country32">Brazil</label></li>
+<li><input id="country70" name="country[]" type="checkbox" value="70"><span class="ceFlags Bulgaria">&nbsp;</span><label for="country70">Bulgaria</label></li>
+<li><input id="country6" name="country[]" type="checkbox" value="6" checked="checked"><span class="ceFlags Canada">&nbsp;</span><label for="country6">Canada</label></li>
+<li><input id="country27" name="country[]" type="checkbox" value="27"><span class="ceFlags Chile">&nbsp;</span><label for="country27">Chile</label></li>
+<li><input id="country37" name="country[]" type="checkbox" value="37" checked="checked"><span class="ceFlags China">&nbsp;</span><label for="country37">China</label></li>
+<li><input id="country122" name="country[]" type="checkbox" value="122"><span class="ceFlags Colombia">&nbsp;</span><label for="country122">Colombia</label></li>
+<li><input id="country15" name="country[]" type="checkbox" value="15"><span class="ceFlags Costa_Rica">&nbsp;</span><label for="country15">Costa Rica</label></li>
+<li><input id="country78" name="country[]" type="checkbox" value="78"><span class="ceFlags Cote_dIvoire">&nbsp;</span><label for="country78">Cote D'Ivoire</label></li>
+<li><input id="country113" name="country[]" type="checkbox" value="113"><span class="ceFlags Croatia">&nbsp;</span><label for="country113">Croatia</label></li>
+<li><input id="country107" name="country[]" type="checkbox" value="107"><span class="ceFlags Cyprus">&nbsp;</span><label for="country107">Cyprus</label></li>
+<li><input id="country55" name="country[]" type="checkbox" value="55"><span class="ceFlags Czech_Republic">&nbsp;</span><label for="country55">Czech Republic</label></li>
+<li><input id="country24" name="country[]" type="checkbox" value="24"><span class="ceFlags Denmark">&nbsp;</span><label for="country24">Denmark</label></li>
+<li><input id="country59" name="country[]" type="checkbox" value="59"><span class="ceFlags Egypt">&nbsp;</span><label for="country59">Egypt</label></li>
+<li><input id="country89" name="country[]" type="checkbox" value="89"><span class="ceFlags Estonia">&nbsp;</span><label for="country89">Estonia</label></li>
+<li><input id="country72" name="country[]" type="checkbox" value="72" checked="checked"><span class="ceFlags Europe">&nbsp;</span><label for="country72">Euro Zone</label></li>
+<li><input id="country71" name="country[]" type="checkbox" value="71"><span class="ceFlags Finland">&nbsp;</span><label for="country71">Finland</label></li>
+<li><input id="country22" name="country[]" type="checkbox" value="22" checked="checked"><span class="ceFlags France">&nbsp;</span><label for="country22">France</label></li>
+<li><input id="country17" name="country[]" type="checkbox" value="17" checked="checked"><span class="ceFlags Germany">&nbsp;</span><label for="country17">Germany</label></li>
+<li><input id="country74" name="country[]" type="checkbox" value="74"><span class="ceFlags Ghana">&nbsp;</span><label for="country74">Ghana</label></li>
+<li><input id="country51" name="country[]" type="checkbox" value="51"><span class="ceFlags Greece">&nbsp;</span><label for="country51">Greece</label></li>
+<li><input id="country39" name="country[]" type="checkbox" value="39" checked="checked"><span class="ceFlags Hong_Kong">&nbsp;</span><label for="country39">Hong Kong</label></li>
+<li><input id="country93" name="country[]" type="checkbox" value="93"><span class="ceFlags Hungary">&nbsp;</span><label for="country93">Hungary</label></li>
+<li><input id="country106" name="country[]" type="checkbox" value="106"><span class="ceFlags Iceland">&nbsp;</span><label for="country106">Iceland</label></li>
+<li><input id="country14" name="country[]" type="checkbox" value="14" checked="checked"><span class="ceFlags India">&nbsp;</span><label for="country14">India</label></li>
+<li><input id="country48" name="country[]" type="checkbox" value="48"><span class="ceFlags Indonesia">&nbsp;</span><label for="country48">Indonesia</label></li>
+<li><input id="country66" name="country[]" type="checkbox" value="66"><span class="ceFlags Iraq">&nbsp;</span><label for="country66">Iraq</label></li>
+<li><input id="country33" name="country[]" type="checkbox" value="33"><span class="ceFlags Ireland">&nbsp;</span><label for="country33">Ireland</label></li>
+<li><input id="country23" name="country[]" type="checkbox" value="23"><span class="ceFlags Israel">&nbsp;</span><label for="country23">Israel</label></li>
+<li><input id="country10" name="country[]" type="checkbox" value="10" checked="checked"><span class="ceFlags Italy">&nbsp;</span><label for="country10">Italy</label></li>
+<li><input id="country119" name="country[]" type="checkbox" value="119"><span class="ceFlags Jamaica">&nbsp;</span><label for="country119">Jamaica</label></li>
+<li><input id="country35" name="country[]" type="checkbox" value="35" checked="checked"><span class="ceFlags Japan">&nbsp;</span><label for="country35">Japan</label></li>
+<li><input id="country92" name="country[]" type="checkbox" value="92"><span class="ceFlags Jordan">&nbsp;</span><label for="country92">Jordan</label></li>
+<li><input id="country102" name="country[]" type="checkbox" value="102"><span class="ceFlags Kazakhstan">&nbsp;</span><label for="country102">Kazakhstan</label></li>
+<li><input id="country57" name="country[]" type="checkbox" value="57"><span class="ceFlags Kenya">&nbsp;</span><label for="country57">Kenya</label></li>
+<li><input id="country94" name="country[]" type="checkbox" value="94"><span class="ceFlags Kuwait">&nbsp;</span><label for="country94">Kuwait</label></li>
+<li><input id="country204" name="country[]" type="checkbox" value="204"><span class="ceFlags Kyrgyzstan">&nbsp;</span><label for="country204">Kyrgyzstan</label></li>
+<li><input id="country97" name="country[]" type="checkbox" value="97"><span class="ceFlags Latvia">&nbsp;</span><label for="country97">Latvia</label></li>
+<li><input id="country68" name="country[]" type="checkbox" value="68"><span class="ceFlags Lebanon">&nbsp;</span><label for="country68">Lebanon</label></li>
+<li><input id="country96" name="country[]" type="checkbox" value="96"><span class="ceFlags Lithuania">&nbsp;</span><label for="country96">Lithuania</label></li>
+<li><input id="country103" name="country[]" type="checkbox" value="103"><span class="ceFlags Luxembourg">&nbsp;</span><label for="country103">Luxembourg</label></li>
+<li><input id="country111" name="country[]" type="checkbox" value="111"><span class="ceFlags Malawi">&nbsp;</span><label for="country111">Malawi</label></li>
+<li><input id="country42" name="country[]" type="checkbox" value="42"><span class="ceFlags Malaysia">&nbsp;</span><label for="country42">Malaysia</label></li>
+<li><input id="country109" name="country[]" type="checkbox" value="109"><span class="ceFlags Malta">&nbsp;</span><label for="country109">Malta</label></li>
+<li><input id="country188" name="country[]" type="checkbox" value="188"><span class="ceFlags Mauritius">&nbsp;</span><label for="country188">Mauritius</label></li>
+<li><input id="country7" name="country[]" type="checkbox" value="7"><span class="ceFlags Mexico">&nbsp;</span><label for="country7">Mexico</label></li>
+<li><input id="country139" name="country[]" type="checkbox" value="139"><span class="ceFlags Mongolia">&nbsp;</span><label for="country139">Mongolia</label></li>
+<li><input id="country247" name="country[]" type="checkbox" value="247"><span class="ceFlags Montenegro">&nbsp;</span><label for="country247">Montenegro</label></li>
+<li><input id="country105" name="country[]" type="checkbox" value="105"><span class="ceFlags Morocco">&nbsp;</span><label for="country105">Morocco</label></li>
+<li><input id="country82" name="country[]" type="checkbox" value="82"><span class="ceFlags Mozambique">&nbsp;</span><label for="country82">Mozambique</label></li>
+<li><input id="country172" name="country[]" type="checkbox" value="172"><span class="ceFlags Namibia">&nbsp;</span><label for="country172">Namibia</label></li>
+<li><input id="country21" name="country[]" type="checkbox" value="21"><span class="ceFlags Netherlands">&nbsp;</span><label for="country21">Netherlands</label></li>
+<li><input id="country43" name="country[]" type="checkbox" value="43" checked="checked"><span class="ceFlags New_Zealand">&nbsp;</span><label for="country43">New Zealand</label></li>
+<li><input id="country20" name="country[]" type="checkbox" value="20"><span class="ceFlags Nigeria">&nbsp;</span><label for="country20">Nigeria</label></li>
+<li><input id="country60" name="country[]" type="checkbox" value="60"><span class="ceFlags Norway">&nbsp;</span><label for="country60">Norway</label></li>
+<li><input id="country87" name="country[]" type="checkbox" value="87"><span class="ceFlags Oman">&nbsp;</span><label for="country87">Oman</label></li>
+<li><input id="country44" name="country[]" type="checkbox" value="44"><span class="ceFlags Pakistan">&nbsp;</span><label for="country44">Pakistan</label></li>
+<li><input id="country193" name="country[]" type="checkbox" value="193"><span class="ceFlags Palestine">&nbsp;</span><label for="country193">Palestinian Territory</label></li>
+<li><input id="country148" name="country[]" type="checkbox" value="148"><span class="ceFlags Paraguay">&nbsp;</span><label for="country148">Paraguay</label></li>
+<li><input id="country125" name="country[]" type="checkbox" value="125"><span class="ceFlags Peru">&nbsp;</span><label for="country125">Peru</label></li>
+<li><input id="country45" name="country[]" type="checkbox" value="45"><span class="ceFlags Philippines">&nbsp;</span><label for="country45">Philippines</label></li>
+<li><input id="country53" name="country[]" type="checkbox" value="53"><span class="ceFlags Poland">&nbsp;</span><label for="country53">Poland</label></li>
+<li><input id="country38" name="country[]" type="checkbox" value="38"><span class="ceFlags Portugal">&nbsp;</span><label for="country38">Portugal</label></li>
+<li><input id="country170" name="country[]" type="checkbox" value="170"><span class="ceFlags Qatar">&nbsp;</span><label for="country170">Qatar</label></li>
+<li><input id="country100" name="country[]" type="checkbox" value="100"><span class="ceFlags Romania">&nbsp;</span><label for="country100">Romania</label></li>
+<li><input id="country56" name="country[]" type="checkbox" value="56" checked="checked"><span class="ceFlags Russian_Federation">&nbsp;</span><label for="country56">Russia</label></li>
+<li><input id="country80" name="country[]" type="checkbox" value="80"><span class="ceFlags Rwanda">&nbsp;</span><label for="country80">Rwanda</label></li>
+<li><input id="country52" name="country[]" type="checkbox" value="52"><span class="ceFlags Saudi_Arabia">&nbsp;</span><label for="country52">Saudi Arabia</label></li>
+<li><input id="country238" name="country[]" type="checkbox" value="238"><span class="ceFlags Serbia">&nbsp;</span><label for="country238">Serbia</label></li>
+<li><input id="country36" name="country[]" type="checkbox" value="36" checked="checked"><span class="ceFlags Singapore">&nbsp;</span><label for="country36">Singapore</label></li>
+<li><input id="country90" name="country[]" type="checkbox" value="90"><span class="ceFlags Slovakia">&nbsp;</span><label for="country90">Slovakia</label></li>
+<li><input id="country112" name="country[]" type="checkbox" value="112"><span class="ceFlags Slovenia">&nbsp;</span><label for="country112">Slovenia</label></li>
+<li><input id="country110" name="country[]" type="checkbox" value="110" checked="checked"><span class="ceFlags South_Africa">&nbsp;</span><label for="country110">South Africa</label></li>
+<li><input id="country11" name="country[]" type="checkbox" value="11" checked="checked"><span class="ceFlags South_Korea">&nbsp;</span><label for="country11">South Korea</label></li>
+<li><input id="country26" name="country[]" type="checkbox" value="26" checked="checked"><span class="ceFlags Spain">&nbsp;</span><label for="country26">Spain</label></li>
+<li><input id="country162" name="country[]" type="checkbox" value="162"><span class="ceFlags Sri_Lanka">&nbsp;</span><label for="country162">Sri Lanka</label></li>
+<li><input id="country9" name="country[]" type="checkbox" value="9"><span class="ceFlags Sweden">&nbsp;</span><label for="country9">Sweden</label></li>
+<li><input id="country12" name="country[]" type="checkbox" value="12" checked="checked"><span class="ceFlags Switzerland">&nbsp;</span><label for="country12">Switzerland</label></li>
+<li><input id="country46" name="country[]" type="checkbox" value="46"><span class="ceFlags Taiwan">&nbsp;</span><label for="country46">Taiwan</label></li>
+<li><input id="country85" name="country[]" type="checkbox" value="85"><span class="ceFlags Tanzania">&nbsp;</span><label for="country85">Tanzania</label></li>
+<li><input id="country41" name="country[]" type="checkbox" value="41"><span class="ceFlags Thailand">&nbsp;</span><label for="country41">Thailand</label></li>
+<li><input id="country202" name="country[]" type="checkbox" value="202"><span class="ceFlags Tunisia">&nbsp;</span><label for="country202">Tunisia</label></li>
+<li><input id="country63" name="country[]" type="checkbox" value="63"><span class="ceFlags Turkey">&nbsp;</span><label for="country63">Türkiye</label></li>
+<li><input id="country123" name="country[]" type="checkbox" value="123"><span class="ceFlags Uganda">&nbsp;</span><label for="country123">Uganda</label></li>
+<li><input id="country61" name="country[]" type="checkbox" value="61"><span class="ceFlags Ukraine">&nbsp;</span><label for="country61">Ukraine</label></li>
+<li><input id="country143" name="country[]" type="checkbox" value="143"><span class="ceFlags Dubai">&nbsp;</span><label for="country143">United Arab Emirates</label></li>
+<li><input id="country4" name="country[]" type="checkbox" value="4" checked="checked"><span class="ceFlags UK">&nbsp;</span><label for="country4">United Kingdom</label></li>
+<li><input id="country5" name="country[]" type="checkbox" value="5" checked="checked"><span class="ceFlags USA">&nbsp;</span><label for="country5">United States</label></li>
+<li><input id="country180" name="country[]" type="checkbox" value="180"><span class="ceFlags Uruguay">&nbsp;</span><label for="country180">Uruguay</label></li>
+<li><input id="country168" name="country[]" type="checkbox" value="168"><span class="ceFlags Uzbekistan">&nbsp;</span><label for="country168">Uzbekistan</label></li>
+<li><input id="country138" name="country[]" type="checkbox" value="138"><span class="ceFlags Venezuela">&nbsp;</span><label for="country138">Venezuela</label></li>
+<li><input id="country178" name="country[]" type="checkbox" value="178"><span class="ceFlags Vietnam">&nbsp;</span><label for="country178">Vietnam</label></li>
+<li><input id="country84" name="country[]" type="checkbox" value="84"><span class="ceFlags Zambia">&nbsp;</span><label for="country84">Zambia</label></li>
+<li><input id="country75" name="country[]" type="checkbox" value="75"><span class="ceFlags Zimbabwe">&nbsp;</span><label for="country75">Zimbabwe</label></li>
+</ul>
+</div>
+<div class="clear"></div>
+</div>
+<div id="calendarFilterBox_time" class="ecoFilterBox">
+<div class="left float_lang_base_1">
+<p class="arial_14 bold">Time:</p>
+</div>
+<div class="right float_lang_base_2">
+<fieldset><input type="radio" id="timeFiltertimeRemain" name="timeFilter" value="timeRemain" checked="checked"><label for="timeFiltertimeRemain">Display time remaining until announcement</label></fieldset>
+<fieldset><input type="radio" id="timetimeOnly" name="timeFilter" value="timeOnly"><label for="timeFiltertimeOnly">Display time only</label></fieldset>
+</div>
+<div class="clear"></div>
+</div>
+<div id="calendarFilterBox_category" class="ecoFilterBox">
+<div class="left float_lang_base_1">
+<p class="arial_14 bold">Category:</p>
+<a href="javascript:void(0);" onclick="selectAll('category[]');">Select All</a><br>
+<a href="javascript:void(0);" onclick="clearAll('category[]');">Clear</a>
+</div>
+<div class="right float_lang_base_2">
+<ul class="filterList">
+<li><input id="category_employment" name="category[]" type="checkbox" value="_employment"><label for="category_employment">Employment</label></li>
+<li><input id="category_economicActivity" name="category[]" type="checkbox" value="_economicActivity"><label for="category_economicActivity">Economic Activity</label></li>
+<li><input id="category_inflation" name="category[]" type="checkbox" value="_inflation"><label for="category_inflation">Inflation</label></li>
+<li><input id="category_credit" name="category[]" type="checkbox" value="_credit"><label for="category_credit">Credit</label></li>
+<li><input id="category_centralBanks" name="category[]" type="checkbox" value="_centralBanks"><label for="category_centralBanks">Central Banks</label></li>
+<li><input id="category_confidenceIndex" name="category[]" type="checkbox" value="_confidenceIndex"><label for="category_confidenceIndex">Confidence Index</label></li>
+<li><input id="category_balance" name="category[]" type="checkbox" value="_balance"><label for="category_balance">Balance</label></li>
+<li><input id="category_Bonds" name="category[]" type="checkbox" value="_Bonds"><label for="category_Bonds">Bonds</label></li>
+</ul>
+</div>
+<div class="clear"></div>
+</div>
+<div id="calendarFilterBox_importance" class="ecoFilterBox">
+<div class="left float_lang_base_1">
+<p class="arial_14 bold">Importance:</p>
+</div>
+<div class="right float_lang_base_2">
+<ul class="filterList">
+<li><input id="importance1" name="importance[]" type="checkbox" value="1"><label for="importance1"><i class="grayFullBullishIcon">&nbsp;</i><i class="whiteEmptyBullishIcon">&nbsp;</i><i class="whiteEmptyBullishIcon">&nbsp;</i></label></li>
+<li><input id="importance2" name="importance[]" type="checkbox" value="2"><label for="importance2"><i class="grayFullBullishIcon">&nbsp;</i><i class="grayFullBullishIcon">&nbsp;</i><i class="whiteEmptyBullishIcon">&nbsp;</i></label></li>
+<li><input id="importance3" name="importance[]" type="checkbox" value="3"><label for="importance3"><i class="grayFullBullishIcon">&nbsp;</i><i class="grayFullBullishIcon">&nbsp;</i><i class="grayFullBullishIcon">&nbsp;</i></label></li>
+</ul>
+</div>
+<div class="clear"></div>
+</div>
+<div class="ecoFilterBox submitBox align_center">
+<a href="javascript:void(0);" onclick="calendarFilters.innerFiltersSubmit();" id="ecSubmitButton" class="newBtn Arrow LightGray">Apply</a> <a href="javascript:void(0);" id="filterRestoreDefaults" class="restore"><span class="ecoFilterRestoreIcon"></span>Restore Default Settings</a>
+</div>
+</div>
+<script>
+//declare variables
+var searchFilterCalendar;
+
+$('#filterRestoreDefaults').on('click', function(e){
+	calendarFilters.restoreDefaultFilters();
+});
+
+	window.searchWidget = window.searchWidget || {};
+	window.searchWidget.calendarType = 'economic';
+	window.searchWidget.url = '/economic-calendar/search-auto-complete';
+	window.searchWidget.functionName = '';
+	$(document).ready(initSearchWidget);
+
+</script>
+</div>
+<input type="hidden" name="timeZone" id="timeZone" class="displayNone" value="8">
+<div class="ecoTimeAndText">
+<div id="economicCurrentTime" class="ecoCurrentTime ">
+<span class="grayClockIcon">&nbsp;</span>Current Time:
+<span id="currentTime" class="bold blackFont" data-datetime="2024/10/04 07:40:02">07:43</span>&nbsp;&nbsp;
+<span id="timeZoneGmtOffsetFormatted">(GMT -4:00)</span>&nbsp;&nbsp;
+<span class="dropDownArrowGray"></span> </div>
+<div id="economicCurrentTimePop" class="ecoCurrentTimePop displayNone tooltipPopup noHeader js-timezones-list reverse">
+<div class="content">
+<ul class="js-scrollable-block">
+<li class="addRow" id="liTz2">(GMT -11:00) Midway Island</li>
+<li class="addRow" id="liTz35">(GMT -11:00) Samoa</li>
+<li class="addRow" id="liTz3">(GMT -10:00) Hawaii</li>
+<li class="addRow" id="liTz4">(GMT -8:00) Alaska</li>
+<li class="addRow" id="liTz37">(GMT -7:00) Arizona</li>
+<li class="addRow" id="liTz36">(GMT -7:00) Baja California</li>
+<li class="addRow" id="liTz5">(GMT -7:00) Pacific Time (US &amp; Canada)</li>
+<li class="addRow" id="liTz38">(GMT -6:00) Chihuahua, La Paz, Mazatlan</li>
+<li class="addRow" id="liTz40">(GMT -6:00) Guadalajara, Mexico City, Monterrey</li>
+<li class="addRow" id="liTz6">(GMT -6:00) Mountain Time (US &amp; Canada)</li>
+<li class="addRow" id="liTz42">(GMT -5:00) Bogota, Lima, Quito</li>
+<li class="addRow" id="liTz39">(GMT -5:00) Central America</li>
+<li class="addRow" id="liTz7">(GMT -5:00) Central Time (US &amp; Canada)</li>
+<li class="addRow" id="liTz41">(GMT -5:00) Saskatchewan</li>
+<li class="addRow" id="liTz44">(GMT -4:00) Asuncion</li>
+<li class="addRow" id="liTz9">(GMT -4:00) Caracas</li>
+<li class="addRow" id="liTz45">(GMT -4:00) Cuiaba</li>
+<li class="addRow" id="liTz8">(GMT -4:00) Eastern Time (US &amp; Canada)</li>
+<li class="addRow" id="liTz46">(GMT -4:00) Georgetown, La Paz, Manaus, San Juan</li>
+<li class="addRow" id="liTz43">(GMT -4:00) Indiana (East)</li>
+<li class="addRow" id="liTz10">(GMT -3:00) Atlantic Time (Canada)</li>
+<li class="addRow" id="liTz12">(GMT -3:00) Brasilia</li>
+<li class="addRow" id="liTz48">(GMT -3:00) Buenos Aires</li>
+<li class="addRow" id="liTz49">(GMT -3:00) Cayenne, Fortaleza</li>
+<li class="addRow" id="liTz51">(GMT -3:00) Montevideo</li>
+<li class="addRow" id="liTz47">(GMT -3:00) Santiago</li>
+<li class="addRow" id="liTz11">(GMT -2:30) Newfoundland</li>
+<li class="addRow" id="liTz50">(GMT -2:00) Greenland</li>
+<li class="addRow" id="liTz53">(GMT -1:00) Cape Verde Is.</li>
+<li class="addRow" id="liTz14">(GMT) Azores</li>
+<li class="addRow" id="liTz55">(GMT) Coordinated Universal Time</li>
+<li class="addRow" id="liTz56">(GMT) Monrovia, Reykjavik</li>
+<li class="addRow" id="liTz54">(GMT +1:00) Casablanca</li>
+<li class="addRow" id="liTz15">(GMT +1:00) Dublin, Edinburgh, Lisbon, London</li>
+<li class="addRow" id="liTz166">(GMT +1:00) Lagos</li>
+<li class="addRow" id="liTz60">(GMT +1:00) West Central Africa</li>
+<li class="addRow" id="liTz16">(GMT +2:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna</li>
+<li class="addRow" id="liTz57">(GMT +2:00) Belgrade, Bratislava, Budapest, Ljubljana, Prague</li>
+<li class="addRow" id="liTz58">(GMT +2:00) Brussels, Copenhagen, Madrid, Paris</li>
+<li class="addRow" id="liTz65">(GMT +2:00) Cairo</li>
+<li class="addRow" id="liTz67">(GMT +02:00) Johannesburg</li>
+<li class="addRow" id="liTz59">(GMT +2:00) Sarajevo, Skopje, Warsaw, Zagreb</li>
+<li class="addRow" id="liTz61">(GMT +2:00) Windhoek</li>
+<li class="addRow" id="liTz62">(GMT +3:00) Amman</li>
+<li class="addRow" id="liTz71">(GMT +3:00) Baghdad</li>
+<li class="addRow" id="liTz64">(GMT +3:00) Beirut</li>
+<li class="addRow" id="liTz66">(GMT +3:00) Damascus</li>
+<li class="addRow" id="liTz68">(GMT +3:00) Helsinki, Kyiv, Riga, Sofia, Tallinn, Vilnius</li>
+<li class="addRow" id="liTz63">(GMT +3:00) Istanbul</li>
+<li class="addRow" id="liTz17">(GMT +3:00) Jerusalem</li>
+<li class="addRow" id="liTz70">(GMT +3:00) Kuwait, Riyadh</li>
+<li class="addRow" id="liTz18">(GMT +3:00) Moscow, St. Petersburg, Volgograd</li>
+<li class="addRow" id="liTz72">(GMT +3:00) Nairobi</li>
+<li class="addRow" id="liTz19">(GMT +3:30) Tehran</li>
+<li class="addRow" id="liTz20">(GMT +4:00) Abu Dhabi, Dubai, Muscat</li>
+<li class="addRow" id="liTz73">(GMT +4:00) Baku</li>
+<li class="addRow" id="liTz21">(GMT +4:30) Kabul</li>
+<li class="addRow" id="liTz22">(GMT +5:00) Ekaterinburg</li>
+<li class="addRow" id="liTz77">(GMT +5:00) Karachi</li>
+<li class="addRow" id="liTz23">(GMT +5:30) Chennai, Kolkata, Mumbai, New Delhi</li>
+<li class="addRow" id="liTz79">(GMT +5:30) Colombo</li>
+<li class="addRow" id="liTz24">(GMT +5:45) Kathmandu</li>
+<li class="addRow" id="liTz25">(GMT +6:00) Dhaka</li>
+<li class="addRow" id="liTz26">(GMT +6:30) Yangon (Rangoon)</li>
+<li class="addRow" id="liTz27">(GMT +7:00) Bangkok, Hanoi, Jakarta</li>
+<li class="addRow" id="liTz28">(GMT +8:00) Beijing, Chongqing, Hong Kong, Urumqi</li>
+<li class="addRow" id="liTz178">(GMT +08:00) Manila</li>
+<li class="addRow" id="liTz113">(GMT +8:00) Singapore</li>
+<li class="addRow" id="liTz29">(GMT +9:00) Osaka, Sapporo, Tokyo</li>
+<li class="addRow" id="liTz88">(GMT +9:00) Seoul</li>
+<li class="addRow" id="liTz30">(GMT +9:30) Adelaide</li>
+<li class="addRow" id="liTz91">(GMT +10:00) Brisbane</li>
+<li class="addRow" id="liTz31">(GMT +10:00) Canberra, Melbourne, Sydney</li>
+<li class="addRow" id="liTz94">(GMT +10:00) Vladivostok</li>
+<li class="addRow" id="liTz32">(GMT +11:00) Solomon Is., New Caledonia</li>
+<li class="addRow" id="liTz1">(GMT +12:00) Eniwetok, Kwajalein</li>
+<li class="addRow" id="liTz33">(GMT +13:00) Auckland, Wellington</li>
+</ul>
+</div>
+</div>
+<div class="ecoAutoUpdateText">All data are streaming and updated automatically.</div>
+<div class="clear"></div>
+</div>
+<script>
+    (function(window, $, components) {
+        'use strict';
+
+        var $timezonePopup = $("#economicCurrentTimePop");
+        var $scrollableList = $timezonePopup.find('.js-scrollable-block');
+        var $timezone = $("#timeZone");
+        var $clock = $('#currentTime');
+        var $timezoneOffset = $('#timeZoneGmtOffsetFormatted');
+        var $options = $scrollableList.find('li');
+        var $currentOption;
+
+        var timezonePopup;
+        var autoUpdateMode = true;
+        var clockDateTime;
+        var lastLocalClock;
+        var timerId;
+        var currentValue = $timezone.val();
+        var optionsIdsPrefix = 'liTz';
+        var callbacks = [];
+
+        $(document).ready(function() {
+            timezonePopup = new components.TooltipPopup($timezonePopup);
+        });
+
+        function makeDoubleCharsNumber(num) {
+            return (num > 9) ? num : ('0' + num.toString());
+        }
+
+        function getClockTimeForView(dateObj) {
+            return makeDoubleCharsNumber(dateObj.getHours()) + ':' + makeDoubleCharsNumber(dateObj.getMinutes());
+        }
+
+        function updateClockOnView() {
+            $clock.text(getClockTimeForView(clockDateTime));
+        }
+
+        function getRemainingSecondsFromClock() {
+            return (60 - clockDateTime.getSeconds()) * 1000;
+        }
+
+        function updateClockObj(datetime) {
+            var prevSeconds = clockDateTime.getSeconds();
+            clockDateTime = new Date(datetime);
+            if(prevSeconds > clockDateTime.getSeconds()) {
+                components.Timezone.updateClock(clockDateTime);
+            } else {
+                runInterval();
+            }
+        }
+
+        function runInterval() {
+            lastLocalClock = Date.now();
+            var remainSecondsFromClock = Math.min(getRemainingSecondsFromClock(), 5000);
+            timerId = setTimeout(function () {
+                updateClockObj(clockDateTime.valueOf() + (Date.now() - lastLocalClock));
+            }, remainSecondsFromClock);
+        }
+
+        function scrollPopupContentToCurrentTZ() {
+            $currentOption.addClass('selected');
+
+            $scrollableList
+                .scrollTop(0) // reset list scroll position
+                .scrollTop($currentOption.offset().top - $timezonePopup.offset().top);
+
+            // remove class selected when hovering
+            // binded to options and not to list because list includes the scrollbar of itself.
+            $options.one('mouseenter.scrollPopup', function() {
+                $currentOption.removeClass('selected');
+                $options.off('mouseenter.scrollPopup');
+            });
+
+        }
+
+        components.Timezone = {
+            subscribe: function(fn) {
+                if(typeof fn === 'function') callbacks.push(fn);
+                return this;
+            },
+            getTimezone: function() {
+                return currentValue;
+            },
+            getClockEl: function() {
+                return $clock;
+            },
+            setClockAutoUpdate: function(bool) {
+                autoUpdateMode = !!bool;
+                return this;
+            },
+            setClock: function(datetimeObj) {
+                $clock.text(getClockTimeForView(datetimeObj));
+                return this;
+            },
+            updateClock: function (newDateTimeFormatted) {
+                clockDateTime = new Date(newDateTimeFormatted);
+                updateClockOnView();
+                if (timerId) {
+                    clearTimeout(timerId);
+                }
+                if(autoUpdateMode) {
+                    runInterval();
+                }
+                return this;
+            },
+            setTimezoneOffset: function(str) {
+                $timezoneOffset.html(str);
+                return this;
+            }
+        };
+
+        $("#economicCurrentTime").click(function (eventObject) {
+            if (timezonePopup.isShown()) return;
+            timezonePopup.show();
+
+            scrollPopupContentToCurrentTZ();
+
+            eventObject.stopPropagation();
+        });
+
+        //On selection of a timezone set the hidden select option accordingly.
+        //close the selection div. submit the form and reload the events table.
+        //update the current time.
+        $options
+            .click(function () {
+                var $this = $(this);
+                var optionValue = $this.attr("id").substr(optionsIdsPrefix.length);
+
+                //Select the pressed timeZone
+                currentValue = optionValue;
+                $currentOption = $this;
+                $timezone.val(optionValue);
+
+                //Set the string displaying the time and timezone
+                timezonePopup.hide();
+
+                callbacks.forEach(function (fn) {
+                    fn(currentValue);
+                });
+            })
+            .each(function () {
+                var $this = $(this);
+                var optionValue = $this.attr("id").substr(optionsIdsPrefix.length);
+
+                if(currentValue === optionValue) {
+                    $currentOption = $this;
+                    return false;
+                }
+            });
+
+        // init clock auto update
+        components.Timezone.updateClock(components.Timezone.getClockEl().attr('data-datetime'));
+
+    })(window, jQuery, window.components = window.components || {});
+</script>

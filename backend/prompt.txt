@@ -1,0 +1,526 @@
+from this site https://www.forexfactory.com/news i want to scrape the news data and add it my news page in the website im building 
+
+when any of the elements are clicked in the forex factory news list it redirects you to the page of the news
+this is the html part regarding the news list 
+<ul class="body flexposts"> <li class="flexposts__item flexposts__story flexposts__story--low story low" id="thread1308051" data-timestamp="1728396112"> <div> <span class="flexposts__title title"> <div class="flexposts__story-title"> <ul class="flexposts__storyicon flexposts__storyicon--0"> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> </ul> <a href="/news/1308051-rcmtipp-index-rises-to-a-19-month-high" title="The RealClearMarkets/TIPP Economic Optimism Index, a leading gauge of consumer sentiment, improved by 1.7% in October to 46.9, posting its..."> RCM/TIPP Index Rises To a 19-Month High </a> </div> </span> <div class="flexposts__storydisplay"> <div class="flexposts__storydisplay-info"> <span class="flexposts__caption flexposts__caption--fade caption"><span class="flexposts__storyimpact flexposts__storyimpact--low impact low "></span><a href="/news/1308051-rcmtipp-index-rises-to-a-19-month-high/hit" target="_blank" rel="nofollow">From realclearmarkets.com</a><span class="flexposts__seperator flexposts__seperator--large">|</span><span class="flexposts__nowrap flexposts__time nowrap">39 min ago</span></span> </div> </div> </div> </li><li class="flexposts__item flexposts__story flexposts__story--none story " id="thread1308032" data-timestamp="1728395598"> <div> <span class="flexposts__title title"> <div class="flexposts__story-title"> <ul class="flexposts__storyicon flexposts__storyicon--0"> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> </ul> <a href="/news/1308032-uks-borrowing-costs-outweigh-germanys-by-most-in" title="The gap between yields on UK bonds and their German equivalents is the biggest in more than a year, amid contrasting expectations for ..."> UK’s Borrowing Costs Outweigh Germany’s by Most in a Year </a> </div> </span> <div class="flexposts__storydisplay"> <div class="flexposts__storydisplay-info"> <span class="flexposts__caption flexposts__caption--fade caption"><a href="/news/1308032-uks-borrowing-costs-outweigh-germanys-by-most-in/hit" target="_blank" rel="nofollow">From bnnbloomberg.ca</a><span class="flexposts__seperator flexposts__seperator--large">|</span><span class="flexposts__nowrap flexposts__time nowrap">48 min ago</span></span> </div> </div> </div> </li><li class="flexposts__item flexposts__story flexposts__story--none story " id="thread1308023" data-timestamp="1728391786"> <div> <span class="flexposts__title title"> <div class="flexposts__story-title"> <ul class="flexposts__storyicon flexposts__storyicon--0"> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> </ul> <a href="/news/1308023-tampa-bay-hasnt-been-hit-directly-by-a" title="Florida’s Gulf Coast braced Tuesday for the impact of Hurricane Milton’s winds and expected massive storm surge, which could bring ..."> Tampa Bay hasn’t been hit directly by a major hurricane since 1921. Milton may be the one </a> </div> </span> <div class="flexposts__storydisplay"> <div class="flexposts__storydisplay-info"> <span class="flexposts__caption flexposts__caption--fade caption"><a href="/news/1308023-tampa-bay-hasnt-been-hit-directly-by-a/hit" target="_blank" rel="nofollow">From cnbc.com</a><span class="flexposts__seperator flexposts__seperator--large">|</span><span class="flexposts__nowrap flexposts__time nowrap">1 hr 51 min ago</span></span> </div> </div> </div> </li><li class="flexposts__item flexposts__story flexposts__story--low story low" id="thread1308031" data-timestamp="1728390610"> <div> <span class="flexposts__title title"> <div class="flexposts__story-title"> <ul class="flexposts__storyicon flexposts__storyicon--0"> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> </ul> <a href="/news/1308031-us-international-trade-in-goods-and-services-august" title="The U.S. Census Bureau and the U.S. Bureau of Economic Analysis announced today that the goods and services deficit was $70.4 billion in ..."> U.S. International Trade in Goods and Services, August 2024 </a> </div> </span> <div class="flexposts__storydisplay"> <div class="flexposts__storydisplay-info"> <span class="flexposts__caption flexposts__caption--fade caption"><span class="flexposts__storyimpact flexposts__storyimpact--low impact low "></span><a href="/news/1308031-us-international-trade-in-goods-and-services-august/hit" target="_blank" rel="nofollow">From bea.gov</a><span class="flexposts__seperator flexposts__seperator--large">|</span><span class="flexposts__nowrap flexposts__time nowrap">2 hr 11 min ago</span></span> </div> </div> </div> </li><li class="flexposts__item flexposts__story flexposts__story--none story " id="thread1308021" data-timestamp="1728387968"> <div> <span class="flexposts__title title"> <div class="flexposts__story-title"> <ul class="flexposts__storyicon flexposts__storyicon--0"> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> </ul> <a href="/news/1308021-white-house-loses-trust-in-israeli-government-as" title="The Biden administration has in recent weeks grown increasingly distrustful of what the Israeli government says about its military and ..."> White House loses trust in Israeli government as Middle East spirals </a> </div> </span> <div class="flexposts__storydisplay"> <div class="flexposts__storydisplay-info"> <span class="flexposts__caption flexposts__caption--fade caption"><a href="/news/1308021-white-house-loses-trust-in-israeli-government-as/hit" target="_blank" rel="nofollow">From axios.com</a><span class="flexposts__seperator flexposts__seperator--large">|</span><span class="flexposts__nowrap flexposts__time nowrap">2 hr 55 min ago</span><span class="flexposts__comments comments"><span class="flexposts__seperator flexposts__seperator--large">|</span><a href="/news/1308021-white-house-loses-trust-in-israeli-government-as#post15022805" title="Last comment by fxpider:
+It should be the other way around. No one trusts the White House. With friends like the white ...">3 comments<span class="icon icon--green-go"></span></a></span></span> </div> </div> </div> </li><li class="flexposts__item flexposts__story flexposts__story--none story " id="thread1308020" data-timestamp="1728385698"> <div> <span class="flexposts__title title"> <div class="flexposts__story-title"> <ul class="flexposts__storyicon flexposts__storyicon--0"> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> </ul> <a href="/news/1308020-gbpusd-loses-3-from-2-year-high" title="GBPUSD is pausing its downward wave that started from the two-and-a-half-year high of 1.3433, hovering near the 50-day simple moving ..."> GBPUSD loses 3% from 2½-year high </a> </div> </span> <div class="flexposts__storydisplay"> <div class="flexposts__storydisplay-info"> <span class="flexposts__caption flexposts__caption--fade caption"><a href="/news/1308020-gbpusd-loses-3-from-2-year-high/hit" target="_blank" rel="nofollow">From xm.com</a><span class="flexposts__seperator flexposts__seperator--large">|</span><span class="flexposts__nowrap flexposts__time nowrap">3 hr ago</span></span> </div> </div> </div> </li><li class="flexposts__item flexposts__story flexposts__story--low story low" id="thread1308012" data-timestamp="1728383033"> <div> <span class="flexposts__title title"> <div class="flexposts__story-title"> <ul class="flexposts__storyicon flexposts__storyicon--0"> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> </ul> <a href="/news/1308012-us-small-business-optimism-index" title="The Optimism Index rose by 0.3 of a point in September to 91.5. This is the 33rd consecutive month below the 50-year average of 98. The ..."> US Small Business Optimism Index </a> </div> </span> <div class="flexposts__storydisplay"> <div class="flexposts__storydisplay-info"> <span class="flexposts__caption flexposts__caption--fade caption"><span class="flexposts__storyimpact flexposts__storyimpact--low impact low "></span><a href="/news/1308012-us-small-business-optimism-index/hit" target="_blank" rel="nofollow">From blob.core.windows.net</a><span class="flexposts__seperator flexposts__seperator--large">|</span><span class="flexposts__nowrap flexposts__time nowrap">4 hr ago</span></span> </div> </div> </div> </li><li class="flexposts__item flexposts__story flexposts__story--none story " id="thread1308010" data-timestamp="1728382132"> <div> <span class="flexposts__title title"> <div class="flexposts__story-title"> <ul class="flexposts__storyicon flexposts__storyicon--0"> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> </ul> <a href="/news/1308010-ecbs-nagel-says-hes-open-to-consider-october" title="Bundesbank Chief Joachim Nagel said he’s willing to talk about an interest-rate cut at next week’s European Central Bank decision. “I want..."> ECB’s Nagel Says He’s Open to Consider October Rate Cut </a> </div> </span> <div class="flexposts__storydisplay"> <div class="flexposts__storydisplay-info"> <span class="flexposts__caption flexposts__caption--fade caption"><a href="/news/1308010-ecbs-nagel-says-hes-open-to-consider-october/hit" target="_blank" rel="nofollow">From bnnbloomberg.ca</a><span class="flexposts__seperator flexposts__seperator--large">|</span><span class="flexposts__nowrap flexposts__time nowrap">4 hr ago</span></span> </div> </div> </div> </li><li class="flexposts__item flexposts__story flexposts__story--none story " id="thread1308002" data-timestamp="1728379011"> <div> <span class="flexposts__title title"> <div class="flexposts__story-title"> <ul class="flexposts__storyicon flexposts__storyicon--0"> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> </ul> <a href="/news/1308002-chinas-yuan-falls-against-strong-us-dollar-stocks" title="China’s yuan fell to its lowest level in nearly three weeks as mainland markets opened on Tuesday after a week-long break, weakened by the..."> China’s yuan falls against strong US dollar, stocks surge after holiday </a> </div> </span> <div class="flexposts__storydisplay"> <div class="flexposts__storydisplay-info"> <span class="flexposts__caption flexposts__caption--fade caption"><a href="/news/1308002-chinas-yuan-falls-against-strong-us-dollar-stocks/hit" target="_blank" rel="nofollow">From brecorder.com</a><span class="flexposts__seperator flexposts__seperator--large">|</span><span class="flexposts__nowrap flexposts__time nowrap">5 hr ago</span></span> </div> </div> </div> </li><li class="flexposts__item flexposts__story flexposts__story--none story " id="thread1307997" data-timestamp="1728375661"> <div> <span class="flexposts__title title"> <div class="flexposts__story-title"> <ul class="flexposts__storyicon flexposts__storyicon--0"> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> </ul> <a href="/news/1307997-sps-dan-yergin-warns-of-dangerous-time-for" title="The global economy is entering a “dangerous time” like never before as Middle East tensions remain elevated, said S&amp;P Global’s vice ..."> S&amp;P's Dan Yergin warns of 'dangerous time' for global economy as Middle East tensions fester </a> </div> </span> <div class="flexposts__storydisplay"> <div class="flexposts__storydisplay-info"> <span class="flexposts__caption flexposts__caption--fade caption"><a href="/news/1307997-sps-dan-yergin-warns-of-dangerous-time-for/hit" target="_blank" rel="nofollow">From cnbc.com</a><span class="flexposts__seperator flexposts__seperator--large">|</span><span class="flexposts__nowrap flexposts__time nowrap">6 hr ago</span></span> </div> </div> </div> </li><li class="flexposts__item flexposts__story flexposts__story--low story low" id="thread1307995" data-timestamp="1728371535"> <div> <span class="flexposts__title title"> <div class="flexposts__story-title"> <ul class="flexposts__storyicon flexposts__storyicon--0"> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> </ul> <a href="/news/1307995-ecbs-kazak-data-points-to-october-interest-rate-cut" title="post: KAZAK: DATA POINTS TO OCTOBER INTEREST-RATE CUT"> ECB's Kazak: Data points to October interest-rate cut </a> </div> </span> <div class="flexposts__storydisplay"> <div class="flexposts__storydisplay-info"> <span class="flexposts__caption flexposts__caption--fade caption"><span class="flexposts__storyimpact flexposts__storyimpact--low impact low "></span><a href="/news/1307995-ecbs-kazak-data-points-to-october-interest-rate-cut/hit" target="_blank" rel="nofollow">From @DeItaone</a><span class="flexposts__seperator flexposts__seperator--large">|</span><span class="flexposts__nowrap flexposts__time nowrap">7 hr ago</span></span> </div> </div> </div> </li><li class="flexposts__item flexposts__story flexposts__story--low story low" id="thread1307994" data-timestamp="1728371420"> <div> <span class="flexposts__title title"> <div class="flexposts__story-title"> <ul class="flexposts__storyicon flexposts__storyicon--4"> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> </ul> <a href="/news/1307994-feds-kugler-i-will-support-additional-rate-cuts" title="post: FED'S KUGLER: I WILL SUPPORT ADDITIONAL RATE CUTS IF PROGRESS ON INFLATION CONTINUES AS EXPECTED. post: FED'S KUGLER: OUR APPROACH TO..."> Fed's Kugler: I will support additional rate cuts if progress on inflation continues as expected </a> </div> </span> <div class="flexposts__storydisplay"> <div class="flexposts__storydisplay-info"> <span class="flexposts__caption flexposts__caption--fade caption"><span class="flexposts__storyimpact flexposts__storyimpact--low impact low "></span><a href="/news/1307994-feds-kugler-i-will-support-additional-rate-cuts/hit" target="_blank" rel="nofollow">From @financialjuice</a><span class="flexposts__seperator flexposts__seperator--large">|</span><span class="flexposts__nowrap flexposts__time nowrap">7 hr ago</span></span> </div> </div> </div> </li><li class="flexposts__item flexposts__story flexposts__story--low story low" id="thread1307993" data-timestamp="1728370723"> <div> <span class="flexposts__title title"> <div class="flexposts__story-title"> <ul class="flexposts__storyicon flexposts__storyicon--0"> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> </ul> <a href="/news/1307993-french-trade-monthly-analysis-august-2024" title="In August 2024*, France's commercial sales will degrade slightly (- 0,2 billion d'euros) and established at - 6,7 billions d'euros. Over ..."> French Trade Monthly Analysis - August 2024 </a> </div> </span> <div class="flexposts__storydisplay"> <div class="flexposts__storydisplay-info"> <span class="flexposts__caption flexposts__caption--fade caption"><span class="flexposts__storyimpact flexposts__storyimpact--low impact low "></span><a href="/news/1307993-french-trade-monthly-analysis-august-2024/hit" target="_blank" rel="nofollow">From finances.gouv.fr</a><span class="flexposts__seperator flexposts__seperator--large">|</span><span class="flexposts__nowrap flexposts__time nowrap">7 hr ago</span></span> </div> </div> </div> </li><li class="flexposts__item flexposts__story flexposts__story--none story " id="thread1307963" data-timestamp="1728370445"> <div> <span class="flexposts__title title"> <div class="flexposts__story-title"> <ul class="flexposts__storyicon flexposts__storyicon--0"> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> </ul> <a href="/news/1307963-occ-allows-national-banks-and-federal-savings-associations" title="The Office of the Comptroller of the Currency (OCC) today issued a proclamation allowing national banks, federal savings associations, and..."> OCC Allows National Banks and Federal Savings Associations in Florida Affected by Hurricane Milton... </a> </div> </span> <div class="flexposts__storydisplay"> <div class="flexposts__storydisplay-info"> <span class="flexposts__caption flexposts__caption--fade caption"><a href="/news/1307963-occ-allows-national-banks-and-federal-savings-associations/hit" target="_blank" rel="nofollow">From occ.gov</a><span class="flexposts__seperator flexposts__seperator--large">|</span><span class="flexposts__nowrap flexposts__time nowrap">7 hr ago</span></span> </div> </div> </div> </li><li class="flexposts__item flexposts__story flexposts__story--low story low" id="thread1307985" data-timestamp="1728367662"> <div> <span class="flexposts__title title"> <div class="flexposts__story-title"> <ul class="flexposts__storyicon flexposts__storyicon--0"> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> <li></li> </ul> <a href="/news/1307985-german-production-in-august-2024-29-compared-to" title="According to preliminary data from the Federal Statistical Office (Destatis), real (price-adjusted) production in the manufacturing sector..."> German production in August 2024: +2.9% compared to the previous month </a> </div> </span> <div class="flexposts__storydisplay"> <div class="flexposts__storydisplay-info"> <span class="flexposts__caption flexposts__caption--fade caption"><span class="flexposts__storyimpact flexposts__storyimpact--low impact low "></span><a href="/news/1307985-german-production-in-august-2024-29-compared-to/hit" target="_blank" rel="nofollow">From destatis.de</a><span class="flexposts__seperator flexposts__seperator--large">|</span><span class="flexposts__nowrap flexposts__time nowrap">8 hr ago</span></span> </div> </div> </div> </li> </ul>
+
+
+and for example this is the redirected link 
+https://www.forexfactory.com/news/1308051-rcmtipp-index-rises-to-a-19-month-high
+
+i want to generate a scraping technique like this one for the economic calnedar 
+backend\scraper\calendarScraper.js
+import fetch from 'node-fetch';
+import * as cheerio from 'cheerio';
+
+const BASE_URL = 'https://www.forexfactory.com';
+
+/**
+ * Function to scrape the economic calendar from ForexFactory based on a specific timeframe.
+ */
+async function scrapeForexFactory(timeframeUrl) {
+    try {
+        const response = await fetch(`${BASE_URL}${timeframeUrl}`);
+        const body = await response.text();
+        const $ = cheerio.load(body);
+
+        const events = [];
+
+        // Loop through each row of the calendar
+        $('table.calendar__table tbody').each((_, tbody) => {
+            let currentDay = null;
+
+            $(tbody).find('tr').each((_, row) => {
+                // Handle day-breakers to group events by day
+                if ($(row).hasClass('calendar__row--day-breaker')) {
+                    currentDay = $(row).text().trim(); // Capture the date for the day
+                    return; // Skip to the next row
+                }
+
+                const time = $(row).find('td.calendar__time').text().trim();
+                const currency = $(row).find('td.calendar__currency').text().trim();
+                const event = $(row).find('td.calendar__event .calendar__event-title').text().trim();
+                
+                // Scrape the impact
+                const impactElement = $(row).find('td.calendar__impact span');
+                const impactClass = impactElement.attr('class') || ''; 
+                const impactTitle = impactElement.attr('title') || 'Low Impact'; 
+                
+                let impact = 'low'; 
+                if (impactClass.includes('icon--ff-impact-red')) {
+                    impact = 'high';
+                } else if (impactClass.includes('icon--ff-impact-ora')) {
+                    impact = 'medium';
+                } else if (impactClass.includes('icon--ff-impact-gra')) {
+                    impact = 'non-economic';
+                }
+
+                const actual = $(row).find('td.calendar__actual span').text().trim();
+                const actualClass = $(row).find('td.calendar__actual span').attr('class') || '';
+                const actualTitle = $(row).find('td.calendar__actual span').attr('title') || '';
+
+                const forecast = $(row).find('td.calendar__forecast span').text().trim();
+
+                const previous = $(row).find('td.calendar__previous span').text().trim();
+                const previousClass = $(row).find('td.calendar__previous span').attr('class') || '';
+                const previousTitle = $(row).find('td.calendar__previous span').attr('title') || '';
+
+                if (event) {
+                    events.push({
+                        date: currentDay || 'N/A', // Use 'N/A' as fallback if date is empty
+                        time: time || 'N/A',
+                        currency: currency || 'N/A',
+                        event,
+                        impact,  
+                        actual: actual || '',
+                        actualClass: actualClass || '',
+                        actualTitle: actualTitle || '',
+                        forecast: forecast || '',
+                        previous: previous || '',
+                        previousClass: previousClass || '',
+                        previousTitle: previousTitle || '',
+                    });
+                }
+            });
+        });
+
+        return events;
+    } catch (error) {
+        console.error('Error scraping ForexFactory:', error);
+        return [];
+    }
+}
+
+/**
+ * Wrapper to handle timeframes for scraping like today, tomorrow, this week, etc.
+ */
+async function scrapeForexFactoryRange(timeframe) {
+    let urlPart;
+    switch (timeframe) {
+        case 'today':
+            urlPart = '/calendar?day=today';
+            break;
+        case 'tomorrow':
+            urlPart = '/calendar?day=tomorrow';
+            break;
+        case 'thisWeek':
+            urlPart = '/calendar?week=this';
+            break;
+        case 'nextWeek':
+            urlPart = '/calendar?week=next';
+            break;
+        case 'thisMonth':
+            urlPart = '/calendar?month=this';
+            break;
+        case 'nextMonth':
+            urlPart = '/calendar?month=next';
+            break;
+        case 'yesterday':
+            urlPart = '/calendar?day=yesterday';
+            break;
+        case 'lastWeek':
+            urlPart = '/calendar?week=last';
+            break;
+        case 'lastMonth':
+            urlPart = '/calendar?month=last';
+            break;
+        default:
+            urlPart = '/calendar?day=today'; // Default to today if timeframe is not recognized
+    }
+
+    console.log(`Scraping for timeframe: ${timeframe} using URL: ${urlPart}`);
+    return await scrapeForexFactory(urlPart);
+}
+
+export { scrapeForexFactoryRange };
+
+backend\server\server.js
+import express from 'express';
+import cors from 'cors';
+import { scrapeForexFactoryRange } from '../scraper/calendarScraper.js';
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+app.use(cors());
+
+app.get('/api/calendar', async (req, res) => {
+    const { timeframe } = req.query;
+
+    if (!timeframe) {
+        return res.status(400).json({ error: 'Please provide a valid timeframe.' });
+    }
+
+    try {
+        const events = await scrapeForexFactoryRange(timeframe);
+        res.json({ events });
+    } catch (error) {
+        console.error('Error fetching calendar data:', error);
+        res.status(500).json({ error: 'Error fetching calendar data.' });
+    }
+});
+
+app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});
+
+
+when i click on news tab i want to see a list of news made in a professional and appealing way and it should get the news from scraping https://www.forexfactory.com/news 
+src\pages\dashboard\components\Sidebar.tsx
+import React, { useState, createContext, useContext } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  IconMenu2,
+  IconSearch,
+  IconGraphFilled,
+  IconCurrencyBitcoin,
+  IconActivity,
+  IconComponents,
+  IconDeviceHeartMonitorFilled,
+  IconLetterESmall,
+  IconHeartPlus,
+  IconNews,
+  IconCalendar,
+  IconSettings, // Import settings icon
+} from '@tabler/icons-react';
+import { Link } from 'react-router-dom';
+
+// Interface for the links
+interface LinkItem {
+  label: string;
+  href?: string;
+  icon: React.ReactNode;
+  onClick?: () => void;
+}
+
+// Props for Sidebar including onShowCalendar
+interface SidebarProps {
+  onShowCalendar: () => void;  // The function to show the calendar
+}
+
+// Context to manage sidebar state
+interface SidebarContextProps {
+  open: boolean;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+const SidebarContext = createContext<SidebarContextProps | undefined>(undefined);
+
+export const useSidebar = () => {
+  const context = useContext(SidebarContext);
+  if (!context) {
+    throw new Error('useSidebar must be used within a SidebarProvider');
+  }
+  return context;
+};
+
+// Sidebar provider to manage open/close state
+export const SidebarProvider = ({
+  children,
+  open: openProp,
+  setOpen: setOpenProp,
+}: {
+  children: React.ReactNode;
+  open?: boolean;
+  setOpen?: React.Dispatch<React.SetStateAction<boolean>>;
+}) => {
+  const [openState, setOpenState] = useState(false);
+
+  const open = openProp !== undefined ? openProp : openState;
+  const setOpen = setOpenProp !== undefined ? setOpenProp : setOpenState;
+
+  return (
+    <SidebarContext.Provider value={{ open, setOpen }}>
+      {children}
+    </SidebarContext.Provider>
+  );
+};
+
+// Main Sidebar component with props for onShowCalendar
+export const Sidebar = ({ onShowCalendar }: SidebarProps) => {
+  return (
+    <SidebarProvider>
+      <DesktopSidebar onShowCalendar={onShowCalendar} />
+      <MobileSidebar onShowCalendar={onShowCalendar} />
+    </SidebarProvider>
+  );
+};
+
+// Animation settings for sidebar toggle
+const sidebarVariants = {
+  expanded: {
+    width: '250px',
+    transition: {
+      type: 'spring',
+      stiffness: 100,
+      damping: 20,
+    },
+  },
+  collapsed: {
+    width: '70px',
+    transition: {
+      type: 'spring',
+      stiffness: 100,
+      damping: 20,
+    },
+  },
+};
+
+// Desktop Sidebar component
+const DesktopSidebar = ({ onShowCalendar }: SidebarProps) => {
+  const { open, setOpen } = useSidebar();
+
+  return (
+    <motion.div
+      className="fixed top-[64px] left-0 h-[calc(100vh-64px)] bg-gray-100 dark:bg-gray-800 shadow-lg z-50"
+      variants={sidebarVariants}
+      initial="collapsed"
+      animate={open ? 'expanded' : 'collapsed'}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      style={{ overflow: 'hidden' }}
+    >
+      <div className="flex flex-col h-full">
+        <SidebarContent onShowCalendar={onShowCalendar} />
+      </div>
+    </motion.div>
+  );
+};
+
+// Mobile Sidebar component
+const MobileSidebar = ({ onShowCalendar }: SidebarProps) => {
+  const { open, setOpen } = useSidebar();
+
+  return (
+    <div className="md:hidden">
+      <div className="h-10 px-4 py-4 flex items-center justify-between bg-gray-100 dark:bg-gray-800 fixed top-0 left-0 w-full z-50 shadow-lg">
+        <IconMenu2
+          className="text-gray-800 dark:text-gray-200 cursor-pointer"
+          onClick={() => setOpen(!open)}
+        />
+      </div>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ x: '-100%', opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '-100%', opacity: 0 }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            className="fixed h-full w-full inset-0 bg-gray-100 dark:bg-gray-800 p-4 z-50 flex flex-col overflow-y-auto"
+          >
+            <div className="flex flex-col h-full mt-10">
+              <SidebarContent onShowCalendar={onShowCalendar} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// SidebarContent with buttons and search bar
+const SidebarContent = ({ onShowCalendar }: SidebarProps) => {
+  const { open } = useSidebar();
+
+  const sidebarLinks: LinkItem[] = [
+    { label: 'Forex', href: '/forex', icon: <IconGraphFilled className="text-white text-lg" /> },
+    { label: 'Crypto', href: '/crypto', icon: <IconCurrencyBitcoin className="text-white text-lg" /> },
+    { label: 'Actions', href: '/actions', icon: <IconActivity className="text-white text-lg" /> },
+    { label: 'Commodities', href: '/commodities', icon: <IconComponents className="text-white text-lg" /> },
+    { label: 'Bonds', href: '/bonds', icon: <IconDeviceHeartMonitorFilled className="text-white text-lg" /> },
+    { label: 'ETF', href: '/etf', icon: <IconLetterESmall className="text-white text-2xl" /> },
+    { label: 'Favorites', href: '/favorites', icon: <IconHeartPlus className="text-white text-lg" /> },
+    { 
+      label: 'Calendrier Économique', 
+      href: '#', 
+      icon: <IconCalendar className="text-white text-lg" />, 
+      onClick: onShowCalendar  // Trigger the calendar display function
+    },
+  ];
+
+  return (
+    <div className="flex flex-col h-full justify-between">
+      <div className="space-y-2"> {/* Reduced space between buttons */}
+        {/* Search bar */}
+        <div className="flex items-center justify-center px-2 py-4">
+          {open ? (
+            <motion.input
+              type="text"
+              placeholder="Search..."
+              className="w-full px-2 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ opacity: 1, width: '100%' }}
+              transition={{ duration: 0.3 }}
+            />
+          ) : (
+            <IconSearch className="text-gray-700 dark:text-gray-200 text-xl cursor-pointer" />
+          )}
+        </div>
+
+        {/* Sidebar Links */}
+        {sidebarLinks.map((link) => (
+          <SidebarLink key={link.label} link={link} />
+        ))}
+      </div>
+
+      <div className="border-t border-gray-300 dark:border-gray-700 my-4" />
+      {/* Bottom Links */}
+      <div className="space-y-2"> {/* Reduced space between bottom links */}
+        <SidebarLink
+          link={{ label: 'News', href: '/news', icon: <IconNews className="text-white text-lg" /> }} 
+        />
+        <SidebarLink
+          link={{ label: 'Settings', href: '/settings', icon: <IconSettings className="text-white text-lg" /> }} 
+        />
+      </div>
+    </div>
+  );
+};
+
+// SidebarLink component with hover effects
+const SidebarLink = ({ link }: { link: LinkItem }) => {
+  const { open } = useSidebar();
+
+  return (
+    <Link
+      to={link.href || '#'}
+      onClick={link.onClick}  // Add the onClick event to handle showing the calendar
+      className="flex items-center gap-2 py-2 pl-3 pr-2 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-700 transition-all duration-150"
+    >
+      <motion.div
+        whileHover={{ scale: 1.1 }}  // Subtle hover effect on icons
+        transition={{ type: 'spring', stiffness: 300 }}
+        className="flex-shrink-0"
+      >
+        {link.icon}
+      </motion.div>
+      {open && (
+        <motion.span
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="text-sm font-medium"
+        >
+          {link.label}
+        </motion.span>
+      )}
+    </Link>
+  );
+};
+
+export default Sidebar;
+
+
+ssrc\pages\dashboard\Dashboard.tsxrc\pages\dashboard\Dashboard.tsx 
+import React, { useState } from 'react';
+import { Sidebar } from './components/Sidebar'; // Ensure correct import path
+import { IconMenu2 } from '@tabler/icons-react';
+import logo from '@/assets/logo-site.png'; // Adjust the path according to your structure
+import Calendar from '@/pages/dashboard/components/CalendarEconomic'; // Import the Calendar component
+
+const Dashboard = () => {
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar open state
+
+  return (
+    <div className="flex flex-col h-screen">
+      {/* Top Menu Bar */}
+      <div className="bg-gray-800 text-white p-4 flex justify-between items-center shadow-md fixed top-0 left-0 right-0 z-50 h-[64px]">
+        {/* Left Section: Logo and Mobile Menu Button */}
+        <div className="flex items-center">
+          <button
+            className="text-white text-xl md:hidden"
+            onClick={() => setSidebarOpen(!sidebarOpen)} // Toggle sidebar on mobile
+          >
+            <IconMenu2 />
+          </button>
+          <div className="relative flex items-center ml-4">
+            <img
+              src={logo}
+              alt="Logo"
+              className="h-12 mr-3" // Adjust size as needed
+            />
+            <span className="text-2xl font-bold">IZYS</span>
+          </div>
+        </div>
+
+        {/* Right Section: Links */}
+        <div className="space-x-4">
+          <span>Portfolio</span>
+          <span>Educational Content</span>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex flex-1 pt-[64px]"> {/* Padding to account for the top menu */}
+        {/* Sidebar (Shifted down by 64px to align under the top menu) */}
+        <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+
+        {/* Main content */}
+        <div className="flex-1 p-4">
+          <main>
+            <h1 className="text-2xl font-bold mb-4"></h1>
+            <Calendar /> {/* Calendar component */}
+          </main>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
+
+// App.tsx
+import React, { useState } from 'react';
+import { Sidebar } from './pages/dashboard/components/Sidebar';
+import { AnimatePresence, motion } from 'framer-motion';
+import Calendar from './pages/dashboard/components/CalendarEconomic'; // Import the Calendar component
+
+const App = () => {
+  const [showCalendarTable, setShowCalendarTable] = useState(false);
+
+  // Function to show the Calendar component
+  const handleShowCalendar = () => {
+    setShowCalendarTable(true); // Show the calendar when clicked, no toggle
+  };
+
+  return (
+    <div>
+      {/* Top Header */}
+      <header className="fixed top-0 left-0 right-0 h-[64px] bg-gray-800 text-white z-50 flex items-center px-4 shadow-lg">
+        <div className="flex items-center space-x-3">
+          <span className="text-2xl font-bold">IZYS</span> {/* Adjust site name */}
+        </div>
+      </header>
+
+      {/* Sidebar and Main Content */}
+      <div className="flex pt-[64px]">
+        {/* Sidebar */}
+        <Sidebar onShowCalendar={handleShowCalendar} /> 
+        <main className="flex-grow p-4 ml-[70px]"> {/* Aligned with collapsed sidebar width */}
+
+          {/* Render the calendar when "Calendrier Économique" is clicked */}
+          <AnimatePresence>
+            {showCalendarTable && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                className="mt-4 bg-white dark:bg-gray-700 p-4 rounded shadow"
+              >
+                <Calendar /> {/* Calendar component */}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default App;
+
+
+update on this codes to add the news page 
+

@@ -1,0 +1,75 @@
+/* Container */
+.calendar-container {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Timeframe Buttons */
+.timeframe-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.timeframe-button {
+  padding: 10px;
+  border-radius: 5px;
+  background-color: #f0f0f0;
+  color: #333;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.timeframe-button.active {
+  background-color: #007bff;
+  color: white;
+}
+
+.timeframe-button:hover {
+  background-color: #0056b3;
+  color: white;
+}
+
+/* Table */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 12px;
+  border-bottom: 1px solid #ccc;
+  text-align: left;
+}
+
+th {
+  background-color: #f8f8f8;
+  font-weight: bold;
+}
+
+tr:hover {
+  background-color: #f1f1f1;
+}
+
+.importance-high {
+  color: white;
+  background-color: #e74c3c;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.importance-medium {
+  color: white;
+  background-color: #f39c12;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.importance-low {
+  color: white;
+  background-color: #2ecc71;
+  padding: 4px 8px;
+  border-radius: 4px;
+}

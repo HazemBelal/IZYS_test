@@ -1,0 +1,55 @@
+/* Sidebar Container */
+.sidebar {
+  width: 60px; /* Default collapsed width */
+  transition: width 0.3s ease;
+  background-color: #2d2d2d; /* Example background color */
+  height: 100vh; /* Full height of the viewport */
+  position: fixed;
+  top: 64px; /* Assuming a 64px top bar height */
+  left: 0;
+  z-index: 1000; /* Ensure it stays above the content */
+}
+
+/* Expanded sidebar on hover */
+.sidebar:hover {
+  width: 250px; /* Expanded width on hover */
+}
+
+/* Search container */
+.search-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px; /* Space around the search icon/input */
+}
+
+/* Search box is hidden by default when sidebar is collapsed */
+.search-box {
+  display: none;
+  width: 180px; /* Adjust width as needed */
+  padding: 8px;
+  background-color: #fff;
+  border-radius: 4px;
+  border: none;
+  outline: none;
+  color: #333;
+  font-size: 14px;
+}
+
+/* Show the search box when sidebar is hovered */
+.sidebar:hover .search-box {
+  display: block;
+}
+
+/* Hide the search icon when sidebar is expanded (hovered) */
+.sidebar:hover .search-icon {
+  display: none;
+}
+
+/* Search icon displayed in collapsed state */
+.search-icon {
+  display: block;
+  font-size: 24px; /* Adjust icon size */
+  cursor: pointer;
+  color: white; /* Icon color */
+}
