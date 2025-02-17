@@ -4,7 +4,7 @@ import { Sidebar } from './pages/dashboard/components/Sidebar';
 import { AnimatePresence, motion } from 'framer-motion';
 import Calendar from './pages/dashboard/components/CalendarEconomic'; // Import Calendar
 import News from './pages/dashboard/components/News'; // Import News
-
+import BondsWidget from './pages/dashboard/components/BondsWidget';
 const App = () => {
   const [showCalendarTable, setShowCalendarTable] = useState(false);
 
@@ -45,6 +45,8 @@ const App = () => {
               </AnimatePresence>
             } />
             <Route path="/news" element={<News />} /> {/* News Route */}
+            <Route path="/bonds" element={<BondsWidget />} />
+
           </Routes>
         </main>
       </div>
