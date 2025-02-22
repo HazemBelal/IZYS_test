@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-const BondsWidget: React.FC = () => {
+const ForexWidget: React.FC = () => {
   const widgetRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -35,15 +35,16 @@ const BondsWidget: React.FC = () => {
       symbolActiveColor: "rgba(41, 98, 255, 0.12)",
       tabs: [
         {
-          title: "Bonds",
+          title: "Forex",
           symbols: [
-            { s: "CBOT:ZB1!", d: "T-Bond" },
-            { s: "CBOT:UB1!", d: "Ultra T-Bond" },
-            { s: "EUREX:FGBL1!", d: "Euro Bund" },
-            { s: "EUREX:FBTP1!", d: "Euro BTP" },
-            { s: "EUREX:FGBM1!", d: "Euro BOBL" }
+            { s: "FX:EURUSD", d: "EUR to USD" },
+            { s: "FX:GBPUSD", d: "GBP to USD" },
+            { s: "FX:USDJPY", d: "USD to JPY" },
+            { s: "FX:USDCHF", d: "USD to CHF" },
+            { s: "FX:AUDUSD", d: "AUD to USD" },
+            { s: "FX:USDCAD", d: "USD to CAD" }
           ],
-          originalTitle: "Bonds"
+          originalTitle: "Forex"
         }
       ]
     });
@@ -59,4 +60,4 @@ const BondsWidget: React.FC = () => {
   );
 };
 
-export default BondsWidget;
+export default ForexWidget;
