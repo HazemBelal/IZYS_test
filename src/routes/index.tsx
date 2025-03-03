@@ -1,16 +1,15 @@
-// src/routes/index.tsx
+// src/index.tsx
+import React from "react";
+import ReactDOM from "react-dom";
+import App from "../App";
+import { BrowserRouter } from "react-router-dom";
+import "./index.css";
 
-import { Route, Routes } from 'react-router-dom';
-import Home from '../pages/home/Home';
-import Dashboard from '../pages/dashboard/Dashboard';
-
-const AppRoutes = () => {
-  return (
-    <Routes>
-      <Route path="/" element={<Dashboard />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-    </Routes>
-  );
-};
-
-export default AppRoutes;
+ReactDOM.render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </React.StrictMode>,
+  document.getElementById("root")
+);
