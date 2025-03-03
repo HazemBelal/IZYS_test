@@ -1,4 +1,3 @@
-// src/pages/dashboard/components/Sidebar.tsx
 import React, { useState, createContext, useContext, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -89,7 +88,9 @@ const DesktopSidebar = ({
 
   useEffect(() => {
     if (selectedMarket) {
-      const eventSource = new EventSource(`http://localhost:5000/api/symbols/stream?category=${selectedMarket}`);
+      const eventSource = new EventSource(
+        `http://localhost:5000/api/symbols/stream?category=${selectedMarket}`
+      );
       eventSource.onmessage = (event) => {
         const newSymbols = JSON.parse(event.data);
         setSymbols((prevSymbols) => [...prevSymbols, ...newSymbols]);
@@ -133,12 +134,6 @@ const DesktopSidebar = ({
       symbol.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Logout handler: remove token and navigate to login
-  const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    navigate("/login");
-  };
-
   return (
     <motion.div
       className="fixed top-[64px] left-0 h-[calc(100vh-64px)] bg-gray-900 dark:bg-gray-800 shadow-lg z-50 hidden md:flex flex-col"
@@ -149,20 +144,9 @@ const DesktopSidebar = ({
       onMouseLeave={() => !selectedMarket && setOpen(false)}
       style={{ overflow: "hidden" }}
     >
-      {/* Main Sidebar Content and Logout button at bottom */}
-      <div className="flex flex-col h-full justify-between">
-        <div>
-          <SidebarContent onShowCalendar={onShowCalendar} setSelectedMarket={setSelectedMarket} onHover={handleHover} />
-        </div>
-        <div>
-          <div
-            className="flex items-center gap-3 py-3 px-4 rounded-lg hover:bg-gray-700 transition-all duration-200 cursor-pointer"
-            onClick={handleLogout}
-          >
-            <IconX />
-            {open && <span className="text-sm">Logout</span>}
-          </div>
-        </div>
+      <div className="flex flex-col h-full">
+        <SidebarContent onShowCalendar={onShowCalendar} setSelectedMarket={setSelectedMarket} onHover={handleHover} />
+        <SidebarWidgetControls />
       </div>
 
       <AnimatePresence>
@@ -228,6 +212,85 @@ const DesktopSidebar = ({
         )}
       </AnimatePresence>
     </motion.div>
+  );
+};
+
+const SidebarWidgetControls: React.FC = () => {
+  const { widgetVisibility, setWidgetVisibility } = useWidgetVisibility();
+  const location = useLocation();
+  const pathParts = location.pathname.split("/");
+  const activeCategory = pathParts[2] || "stocks";
+
+  const widgetToggleMapping: Record<string, { id: string; name: string }[]> = {
+    stocks: [
+      { id: "symbol-info", name: "Symbol Info" },
+      { id: "advanced-chart", name: "Advanced Chart" },
+      { id: "company-profile", name: "Company Profile" },
+      { id: "fundamental-data", name: "Fundamental Data" },
+      { id: "technical-analysis", name: "Technical Analysis" },
+      { id: "top-stories", name: "Top Stories" },
+    ],
+    crypto: [
+      { id: "symbol-info", name: "Symbol Info" },
+      { id: "advanced-chart", name: "Advanced Chart" },
+      { id: "company-profile", name: "Company Profile" },
+      { id: "technical-analysis", name: "Technical Analysis" },
+      { id: "top-stories", name: "Top Stories" },
+      { id: "crypto-coins-heatmap", name: "Coins Heatmap" },
+      { id: "cryptocurrency-market", name: "Crypto Market" },
+    ],
+    forex: [
+      { id: "symbol-info", name: "Symbol Info" },
+      { id: "advanced-chart", name: "Advanced Chart" },
+      { id: "company-profile", name: "Company Profile" },
+      { id: "technical-analysis", name: "Technical Analysis" },
+      { id: "top-stories", name: "Top Stories" },
+      { id: "economic-calendar", name: "Economic Calendar" },
+      { id: "forex-cross-rates", name: "Forex Cross Rates" },
+    ],
+  };
+
+  const controls = widgetToggleMapping[activeCategory] || [];
+  return (
+    <div className="mt-auto p-3 border-t border-gray-700">
+      <h3 className="text-sm font-semibold text-white mb-2">Widget Controls</h3>
+      <div className="flex flex-col gap-1">
+        {controls.map((ctrl) => (
+          <button
+            key={ctrl.id}
+            onClick={() =>
+              setWidgetVisibility((prev: Record<string, boolean>) => ({
+                ...prev,
+                [ctrl.id]: !prev[ctrl.id],
+              }))
+            }
+            className={`px-2 py-1 rounded text-xs ${
+              widgetVisibility[ctrl.id] ? "bg-blue-500 text-white" : "bg-gray-400 text-gray-800"
+            }`}
+          >
+            {ctrl.name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const MobileSidebar = ({ onShowCalendar }: { onShowCalendar: () => void }) => {
+  const { open, setOpen } = useSidebar();
+  return (
+    <div className="md:hidden">
+      <div className="h-10 px-4 py-4 flex items-center justify-between bg-gray-900 dark:bg-gray-800 fixed top-0 left-0 w-full z-50 shadow-lg">
+        <IconMenu2 className="text-white cursor-pointer" onClick={() => setOpen(!open)} />
+      </div>
+      <AnimatePresence>
+        {open && (
+          <motion.div className="fixed h-full w-full inset-0 bg-gray-900 dark:bg-gray-800 p-4 z-50 flex flex-col overflow-y-auto">
+            <SidebarContent onShowCalendar={onShowCalendar} onLinkClick={() => setOpen(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
 

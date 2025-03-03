@@ -1,15 +1,14 @@
 // src/pages/dashboard/components/DashboardWidget.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Rnd } from "react-rnd";
+import { useWidgetVisibility } from "./WidgetVisibilityContext";
 
-// Define a type for widget definitions
 interface WidgetDefinition {
   id: string;
   name: string;
   scriptSrc: string;
   config: Record<string, any>;
-  // default position & size (in pixels)
   default: {
     x: number;
     y: number;
@@ -21,13 +20,12 @@ interface WidgetDefinition {
 const DashboardWidget: React.FC = () => {
   // Expect URL in the format: /dashboard/:category/:symbol
   const { symbol, category } = useParams<{ symbol: string; category: string }>();
-
-  // If category is missing, default to "stocks"
   const effectiveCategory = category ? (category === "bonds" ? "stocks" : category) : "stocks";
 
   console.log("DashboardWidget params:", { category, symbol, effectiveCategory });
 
-  // Define widget definitions per effective category
+  const { widgetVisibility, setWidgetVisibility } = useWidgetVisibility();
+
   const getWidgetDefinitions = (): WidgetDefinition[] => {
     if (!symbol) return [];
     switch (effectiveCategory) {
@@ -367,20 +365,21 @@ const DashboardWidget: React.FC = () => {
     }
   };
 
-  // Widget visibility state (true = shown)
-  const [widgetVisibility, setWidgetVisibility] = useState<Record<string, boolean>>({});
-
-  // When widget definitions change, initialize visibility to true for each
+  // Initialize widget visibility state if not set
   useEffect(() => {
     const defs = getWidgetDefinitions();
-    const initialVisibility: Record<string, boolean> = {};
+    const initial: Record<string, boolean> = {};
     defs.forEach((w) => {
-      initialVisibility[w.id] = true;
+      if (widgetVisibility[w.id] === undefined) {
+        initial[w.id] = true;
+      }
     });
-    setWidgetVisibility(initialVisibility);
-  }, [symbol, effectiveCategory]);
+    if (Object.keys(initial).length > 0) {
+      setWidgetVisibility((prev: Record<string, boolean>) => ({ ...initial, ...prev }));
+    }
+  }, [symbol, effectiveCategory, setWidgetVisibility, widgetVisibility]);
 
-  // When any of the parameters or visibility change, re-insert widget scripts for visible widgets
+  // Re-insert widget scripts when parameters or visibility change (only for visible widgets)
   useEffect(() => {
     const defs = getWidgetDefinitions();
     defs.forEach((widget) => {
@@ -401,59 +400,25 @@ const DashboardWidget: React.FC = () => {
     });
   }, [symbol, effectiveCategory, widgetVisibility]);
 
-  // Get the widget definitions
   const widgetDefs = getWidgetDefinitions();
 
-  // Render the draggable widgets using react-rnd.
-  // Each widget is only rendered if its toggle is on; if off, we render it with opacity 0.3.
+  // Render draggable and resizable widgets (only visible ones)
   const renderWidgets = () => {
-    return widgetDefs.map((widget) => (
-      <Rnd
-        key={widget.id}
-        default={widget.default}
-        bounds="parent"
-        disableDragging={!widgetVisibility[widget.id]} // disable dragging if toggled off
-        style={{ opacity: widgetVisibility[widget.id] ? 1 : 0.3, border: "1px dashed #ccc" }}
-      >
-        <div id={widget.id} style={{ width: "100%", height: "100%" }} />
-      </Rnd>
-    ));
+    return widgetDefs
+      .filter((w) => widgetVisibility[w.id])
+      .map((widget) => (
+        <Rnd
+          key={widget.id}
+          default={widget.default}
+          bounds="parent"
+          enableResizing
+        >
+          <div id={widget.id} style={{ width: "100%", height: "100%" }} />
+        </Rnd>
+      ));
   };
 
-  // Render a toggle panel for the widget list at the bottom
-  const renderTogglePanel = () => {
-    return (
-      <div className="fixed bottom-0 left-0 right-0 bg-gray-200 p-2 flex space-x-2 text-xs">
-        {widgetDefs.map((widget) => (
-          <button
-            key={widget.id}
-            onClick={() =>
-              setWidgetVisibility((prev) => ({
-                ...prev,
-                [widget.id]: !prev[widget.id],
-              }))
-            }
-            className={`px-2 py-1 rounded ${
-              widgetVisibility[widget.id] ? "bg-blue-500 text-white" : "bg-gray-400 text-gray-800"
-            }`}
-          >
-            {widget.name}
-          </button>
-        ))}
-      </div>
-    );
-  };
-
-  // Layout based on category for now (we position widgets arbitrarily in a relative container)
-  // You can adjust the container style as needed.
-  return (
-    <div className="relative h-full w-full">
-      {/* Render the draggable widgets */}
-      {renderWidgets()}
-      {/* Render the toggle panel at the bottom */}
-      {renderTogglePanel()}
-    </div>
-  );
+  return <div className="relative h-full w-full">{renderWidgets()}</div>;
 };
 
 export default DashboardWidget;
