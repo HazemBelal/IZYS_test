@@ -1,6 +1,13 @@
-import React, { useState, createContext, useContext, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   IconMenu2,
   IconGraphFilled,
@@ -14,7 +21,9 @@ import {
   IconX,
   IconSearch,
 } from "@tabler/icons-react";
-import { useWidgetVisibility } from "./WidgetVisibilityContext";
+import { useLocation } from "react-router-dom";
+import { useDashboardWidgets } from "../../../context/DashboardWidgetsContext";
+import { IconAlertCircle } from "@tabler/icons-react";
 
 interface LinkItem {
   label: string;
@@ -48,7 +57,11 @@ export const useSidebar = () => {
 
 export const SidebarProvider = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(false);
-  return <SidebarContext.Provider value={{ open, setOpen }}>{children}</SidebarContext.Provider>;
+  return (
+    <SidebarContext.Provider value={{ open, setOpen }}>
+      {children}
+    </SidebarContext.Provider>
+  );
 };
 
 export const Sidebar = ({ onShowCalendar, onSymbolSelect }: SidebarProps) => {
@@ -79,64 +92,174 @@ const DesktopSidebar = ({
 }) => {
   const { open, setOpen } = useSidebar();
   const navigate = useNavigate();
+
+  // The category user hovered (forex, crypto, etc.)
   const [selectedMarket, setSelectedMarket] = useState<string | null>(null);
+  // The symbol user clicked
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+
   const [symbols, setSymbols] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Controls the "widget slider" on the right
+  const [widgetSliderOpen, setWidgetSliderOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
+  // SSE: load symbols for the chosen category
   useEffect(() => {
-    if (selectedMarket) {
-      const eventSource = new EventSource(
+    if (!selectedMarket) return;
+  
+    let eventSource: EventSource | null = null;
+    let retryCount = 0;
+    const maxRetries = 3;
+    const retryDelay = 3000; // 3 seconds
+  
+    const connectToSSE = () => {
+      eventSource = new EventSource(
         `http://localhost:5000/api/symbols/stream?category=${selectedMarket}`
       );
+  
       eventSource.onmessage = (event) => {
-        const newSymbols = JSON.parse(event.data);
-        setSymbols((prevSymbols) => [...prevSymbols, ...newSymbols]);
+        try {
+          const newSymbols = JSON.parse(event.data);
+          setSymbols((prev) => {
+            // Filter out duplicates before adding new symbols
+            const existingKeys = new Set(prev.map(s => `${s.symbol}-${s.exchange}`));
+            const uniqueNewSymbols = newSymbols.filter(
+              (s: any) => !existingKeys.has(`${s.symbol}-${s.exchange}`)
+            );
+            return [...prev, ...uniqueNewSymbols];
+          });
+          retryCount = 0; // Reset retry counter on successful message
+        } catch (error) {
+          console.error("Error parsing SSE data:", error);
+        }
       };
-      eventSource.onerror = (error) => {
-        console.error("SSE error:", error);
+  
+      eventSource.onerror = () => {
+        if (eventSource) {
+          eventSource.close();
+        }
+        
+        if (retryCount < maxRetries) {
+          retryCount++;
+          console.log(`SSE connection lost. Retrying (${retryCount}/${maxRetries})...`);
+          setTimeout(connectToSSE, retryDelay);
+        } else {
+          console.error("Max SSE retries reached. Giving up.");
+          setError("Connection lost. Please refresh the page.");
+        }
+      };
+    };
+  
+    connectToSSE();
+  
+    return () => {
+      if (eventSource) {
         eventSource.close();
-      };
-      return () => {
-        eventSource.close();
-      };
-    }
+      }
+    };
   }, [selectedMarket]);
-
+  
+  // Improved pagination with abort controller and status tracking
+  const loadMoreSymbols = useCallback(async () => {
+    if (!selectedMarket || !hasMore || loading) return;
+  
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+  
+    setLoading(true);
+    setError(null);
+  
+    try {
+      const res = await fetch(
+        `http://localhost:5000/api/symbols?category=${selectedMarket}&page=${page + 1}&limit=50`,
+        { signal: controller.signal }
+      );
+  
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      
+      const data = await res.json();
+      
+      if (data.symbols.length === 0) {
+        setHasMore(false);
+      } else {
+        setSymbols(prev => {
+          // Deduplicate symbols
+          const existingKeys = new Set(prev.map(s => `${s.symbol}-${s.exchange}`));
+          const uniqueNewSymbols = data.symbols.filter(
+            (s: any) => !existingKeys.has(`${s.symbol}-${s.exchange}`)
+          );
+          return [...prev, ...uniqueNewSymbols];
+        });
+        setPage(p => p + 1);
+        setHasMore(data.symbols.length === 50); // Assume more if we got a full page
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        console.error("Failed to load more symbols:", err);
+        setError("Failed to load more symbols. Please try again.");
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      setLoading(false);
+    }
+  }, [selectedMarket, page, hasMore, loading]);
+  // On hover => fetch symbols
   const handleHover = useCallback((category: string) => {
     setSelectedMarket(category);
     setSymbols([]);
+    setPage(1); // Reset to first page
+    setHasMore(true); // Reset pagination
     setLoading(true);
-    fetch(`http://localhost:5000/api/symbols?category=${category}`)
-      .then((response) => {
-        if (!response.ok) throw new Error("Failed to fetch symbols");
-        return response.json();
+    
+    fetch(`http://localhost:5000/api/symbols?category=${category}&page=1&limit=50`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch symbols");
+        return res.json();
       })
       .then((data) => {
-        console.log("📦 Fetched symbols:", data.symbols);
         setSymbols(data.symbols || []);
+        setHasMore(data.symbols.length === 50);
       })
-      .catch((error) => {
-        console.error("❌ Error fetching symbols:", error);
+      .catch((err) => {
+        console.error("❌ Error fetching symbols:", err);
         setError("Failed to fetch symbols. Please try again.");
-        setSymbols([]);
       })
-      .finally(() => {
-        setLoading(false);
-      });
+      .finally(() => setLoading(false));
   }, []);
 
+  // Filter by search
   const filteredSymbols = symbols.filter(
-    (symbol) =>
-      symbol.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      symbol.description.toLowerCase().includes(searchQuery.toLowerCase())
+    (sym) =>
+      sym.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      sym.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // On symbol click => open widget slider
+  const handleSymbolSelect = (symbol: string) => {
+    setSelectedSymbol(symbol);
+    // Keep the symbol slider open (do not setSelectedMarket(null) if you want to keep it visible)
+    setWidgetSliderOpen(true);
+    // Optionally navigate
+    if (selectedMarket) {
+      navigate(`/dashboard/${selectedMarket}/${symbol}`);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    navigate("/login");
+  };
 
   return (
     <motion.div
-      className="fixed top-[64px] left-0 h-[calc(100vh-64px)] bg-gray-900 dark:bg-gray-800 shadow-lg z-50 hidden md:flex flex-col"
+      className="fixed top-[64px] left-0 h-[calc(100vh-64px)] bg-gray-900 shadow-lg z-50 hidden md:flex flex-col"
       variants={sidebarVariants}
       initial="collapsed"
       animate={open ? "expanded" : "collapsed"}
@@ -144,11 +267,29 @@ const DesktopSidebar = ({
       onMouseLeave={() => !selectedMarket && setOpen(false)}
       style={{ overflow: "hidden" }}
     >
-      <div className="flex flex-col h-full">
-        <SidebarContent onShowCalendar={onShowCalendar} setSelectedMarket={setSelectedMarket} onHover={handleHover} />
-        <SidebarWidgetControls />
+      <div className="flex flex-col h-full justify-between">
+        {/* Sidebar main content */}
+        <div>
+          <SidebarContent
+            onShowCalendar={onShowCalendar}
+            setSelectedMarket={setSelectedMarket}
+            onHover={handleHover}
+          />
+        </div>
+
+        {/* Logout button */}
+        <div>
+          <div
+            className="flex items-center gap-3 py-3 px-4 rounded-lg cursor-pointer hover:bg-gray-700 transition-all duration-200"
+            onClick={handleLogout}
+          >
+            <IconX />
+            {open && <span className="text-sm">Logout</span>}
+          </div>
+        </div>
       </div>
 
+      {/* Symbol Slider */}
       <AnimatePresence>
         {selectedMarket && (
           <motion.div
@@ -156,12 +297,15 @@ const DesktopSidebar = ({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: "-100%", opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="fixed top-[64px] left-[280px] h-[calc(100vh-64px)] bg-gray-900 dark:bg-gray-800 shadow-lg z-50 w-[600px]"
+            className="fixed top-[64px] left-[280px] h-[calc(100vh-64px)] w-[600px] bg-gray-900 shadow-lg z-50"
           >
-            <div className="p-4">
+            <div className="p-4 h-full flex flex-col">
               <div className="flex justify-between items-center mb-4 text-white">
                 <h2 className="text-lg font-bold">{selectedMarket.toUpperCase()}</h2>
-                <IconX className="cursor-pointer" onClick={() => setSelectedMarket(null)} />
+                <IconX
+                  className="cursor-pointer"
+                  onClick={() => setSelectedMarket(null)}
+                />
               </div>
               <div className="relative mb-4">
                 <input
@@ -173,12 +317,24 @@ const DesktopSidebar = ({
                 />
                 <IconSearch className="absolute right-3 top-3 text-gray-400" />
               </div>
-              {loading ? (
-                <div className="text-center text-white">Loading...</div>
-              ) : error ? (
-                <div className="text-red-500 text-center">{error}</div>
-              ) : (
-                <div ref={tableContainerRef} className="overflow-y-auto h-[calc(100vh-150px)] custom-scrollbar">
+              {loading && (
+              <div className="space-y-2">
+                {[...Array(10)].map((_, i) => (
+                  <div key={i} className="flex justify-between p-2 bg-gray-700 rounded animate-pulse">
+                    <div className="h-4 bg-gray-600 rounded w-1/4"></div>
+                    <div className="h-4 bg-gray-600 rounded w-1/2"></div>
+                    <div className="h-4 bg-gray-600 rounded w-1/6"></div>
+                  </div>
+                ))}
+              </div>
+            )}
+              {error && <div className="text-red-500 text-center">{error}</div>}
+
+              {!loading && !error && (
+                <div
+                  ref={tableContainerRef}
+                  className="overflow-y-auto flex-1 custom-scrollbar"
+                >
                   <table className="w-full text-white">
                     <thead>
                       <tr className="bg-gray-700">
@@ -188,19 +344,17 @@ const DesktopSidebar = ({
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredSymbols.map((symbol) => (
+                      {filteredSymbols.map((symObj) => (
                         <tr
-                          key={`${symbol.symbol}-${symbol.exchange}`}
+                          key={`${symObj.symbol}-${symObj.exchange}`}
                           className="hover:bg-gray-700 transition-all duration-150 cursor-pointer"
-                          onClick={() => {
-                            navigate(`/dashboard/${selectedMarket}/${symbol.symbol}`);
-                            setSelectedMarket(null);
-                            setOpen(false);
-                          }}
+                          onClick={() => handleSymbolSelect(symObj.symbol)}
                         >
-                          <td className="px-4 py-2 font-normal">{symbol.symbol}</td>
-                          <td className="px-4 py-2 font-normal">{symbol.description}</td>
-                          <td className="px-4 py-2 font-normal">{symbol.exchange}</td>
+                          <td className="px-4 py-2 font-normal">{symObj.symbol}</td>
+                          <td className="px-4 py-2 font-normal">
+                            {symObj.description}
+                          </td>
+                          <td className="px-4 py-2 font-normal">{symObj.exchange}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -211,88 +365,549 @@ const DesktopSidebar = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Widget Slider => Full screen to the right, so let's do left=880px => width=calc(100vw - 880px) */}
+      <AnimatePresence>
+        {widgetSliderOpen && (
+          <motion.div
+            initial={{ x: "100%", opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: "100%", opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="fixed top-[64px] left-[880px] h-[calc(100vh-64px)] bg-gray-900 text-white shadow-lg z-50"
+            style={{ width: "calc(100vw - 880px)" }}
+          >
+            <div className="h-full flex flex-col">
+              <WidgetTabs
+                selectedSymbol={selectedSymbol}
+                onClose={() => setWidgetSliderOpen(false)}
+                onAddToDashboard={() => {
+                  // By default, close the slider
+                  setWidgetSliderOpen(false);
+                  // If you also want to close the symbol list slider:
+                  // setSelectedMarket(null);
+                }}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
 
-const SidebarWidgetControls: React.FC = () => {
-  const { widgetVisibility, setWidgetVisibility } = useWidgetVisibility();
+// The "WidgetTabs" component is below. (We export it if you prefer.)
+const WidgetTabs: React.FC<{
+  selectedSymbol: string | null;
+  onClose: () => void;
+  onAddToDashboard: () => void;
+}> = ({ selectedSymbol, onClose, onAddToDashboard }) => {
+  const [activeTabIndex, setActiveTabIndex] = useState(0);
   const location = useLocation();
   const pathParts = location.pathname.split("/");
   const activeCategory = pathParts[2] || "stocks";
+  const { addWidget } = useDashboardWidgets();
 
-  const widgetToggleMapping: Record<string, { id: string; name: string }[]> = {
+
+  // The widget definitions for each category, referencing selectedSymbol.
+  // For brevity, we show only stocks/crypto/forex, but you can add more.
+  const widgetToggleMapping: Record<string, { id: string; name: string; scriptSrc: string; config: Record<string, any> }[]> = {
     stocks: [
-      { id: "symbol-info", name: "Symbol Info" },
-      { id: "advanced-chart", name: "Advanced Chart" },
-      { id: "company-profile", name: "Company Profile" },
-      { id: "fundamental-data", name: "Fundamental Data" },
-      { id: "technical-analysis", name: "Technical Analysis" },
-      { id: "top-stories", name: "Top Stories" },
+      {
+        id: "symbol-info",
+        name: "Symbol Info",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js",
+        config: {
+          autosize: true,
+          symbol: selectedSymbol || "NASDAQ:AAPL",
+          width: "100%",
+          locale: "en",
+          colorTheme: "light",
+          isTransparent: true,
+        },
+      },
+      {
+        id: "advanced-chart",
+        name: "Advanced Chart",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js",
+        config: {
+          autosize: true,
+          symbol: selectedSymbol || "NASDAQ:AAPL",
+          interval: "D",
+          timezone: "Etc/UTC",
+          theme: "light",
+          style: "1",
+          locale: "en",
+          allow_symbol_change: true,
+          calendar: false,
+          support_host: "https://www.tradingview.com",
+        },
+      },
+      {
+        id: "company-profile",
+        name: "Company Profile",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-symbol-profile.js",
+        config: {
+          autosize: true,
+          width: "100%",
+          height: "100%",
+          colorTheme: "light",
+          isTransparent: true,
+          symbol: selectedSymbol || "NASDAQ:AAPL",
+          locale: "en",
+        },
+      },
+      {
+        id: "fundamental-data",
+        name: "Fundamental Data",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-financials.js",
+        config: {
+          autosize: true,
+          colorTheme: "light",
+          isTransparent: true,
+          largeChartUrl: "",
+          displayMode: "adaptive",
+          width: "100%",
+          height: "100%",
+          symbol: selectedSymbol || "NASDAQ:AAPL",
+          locale: "en",
+        },
+      },
+      {
+        id: "technical-analysis",
+        name: "Technical Analysis",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js",
+        config: {
+          autosize: true,
+          interval: "15m",
+          width: "100%",
+          isTransparent: true,
+          height: "150%",
+          symbol: selectedSymbol || "NASDAQ:AAPL",
+          showIntervalTabs: true,
+          displayMode: "single",
+          locale: "en",
+          colorTheme: "light",
+        },
+      },
+      {
+        id: "top-stories",
+        name: "Top Stories",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-timeline.js",
+        config: {
+          autosize: true,
+          feedMode: "symbol",
+          symbol: selectedSymbol || "NASDAQ:AAPL",
+          colorTheme: "light",
+          isTransparent: true,
+          displayMode: "regular",
+          width: "100%",
+          height: "100%",
+          locale: "en",
+        },
+      },
     ],
     crypto: [
-      { id: "symbol-info", name: "Symbol Info" },
-      { id: "advanced-chart", name: "Advanced Chart" },
-      { id: "company-profile", name: "Company Profile" },
-      { id: "technical-analysis", name: "Technical Analysis" },
-      { id: "top-stories", name: "Top Stories" },
-      { id: "crypto-coins-heatmap", name: "Coins Heatmap" },
-      { id: "cryptocurrency-market", name: "Crypto Market" },
+      {
+        id: "symbol-info",
+        name: "Symbol Info",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js",
+        config: {
+          autosize: true,
+          symbol: selectedSymbol || "BTCUSD",
+          width: "100%",
+          locale: "en",
+          colorTheme: "light",
+          isTransparent: true,
+        },
+      },
+      {
+        id: "advanced-chart",
+        name: "Advanced Chart",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js",
+        config: {
+          autosize: true,
+          symbol: selectedSymbol || "BTCUSD",
+          interval: "D",
+          timezone: "Etc/UTC",
+          theme: "light",
+          style: "1",
+          locale: "en",
+          allow_symbol_change: true,
+          calendar: false,
+          support_host: "https://www.tradingview.com",
+        },
+      },
+      {
+        id: "company-profile",
+        name: "Company Profile",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-symbol-profile.js",
+        config: {
+          autosize: true,
+          width: "100%",
+          height: "100%",
+          colorTheme: "light",
+          isTransparent: true,
+          symbol: selectedSymbol || "BTCUSD",
+          locale: "en",
+        },
+      },
+      {
+        id: "technical-analysis",
+        name: "Technical Analysis",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js",
+        config: {
+          autosize: true,
+          interval: "15m",
+          width: "100%",
+          isTransparent: true,
+          height: "150%",
+          symbol: selectedSymbol || "BTCUSD",
+          showIntervalTabs: true,
+          displayMode: "single",
+          locale: "en",
+          colorTheme: "light",
+        },
+      },
+      {
+        id: "top-stories",
+        name: "Top Stories",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-timeline.js",
+        config: {
+          autosize: true,
+          feedMode: "symbol",
+          symbol: selectedSymbol || "BTCUSD",
+          colorTheme: "light",
+          isTransparent: true,
+          displayMode: "regular",
+          width: "100%",
+          height: "100%",
+          locale: "en",
+        },
+      },
+      {
+        id: "crypto-coins-heatmap",
+        name: "Coins Heatmap",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-crypto-coins-heatmap.js",
+        config: {
+          autosize: true,
+          width: "100%",
+          height: "100%",
+          colorTheme: "light",
+          isTransparent: true,
+          locale: "en",
+        },
+      },
+      {
+        id: "cryptocurrency-market",
+        name: "Crypto Market",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-cryptocurrency-market.js",
+        config: {
+          autosize: true,
+          width: "100%",
+          height: "100%",
+          colorTheme: "light",
+          isTransparent: true,
+          locale: "en",
+        },
+      },
     ],
     forex: [
-      { id: "symbol-info", name: "Symbol Info" },
-      { id: "advanced-chart", name: "Advanced Chart" },
-      { id: "company-profile", name: "Company Profile" },
-      { id: "technical-analysis", name: "Technical Analysis" },
-      { id: "top-stories", name: "Top Stories" },
-      { id: "economic-calendar", name: "Economic Calendar" },
-      { id: "forex-cross-rates", name: "Forex Cross Rates" },
+      {
+        id: "symbol-info",
+        name: "Symbol Info",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js",
+        config: {
+          autosize: true,
+          symbol: selectedSymbol || "EURUSD",
+          width: "100%",
+          locale: "en",
+          colorTheme: "light",
+          isTransparent: true,
+        },
+      },
+      {
+        id: "advanced-chart",
+        name: "Advanced Chart",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js",
+        config: {
+          autosize: true,
+          symbol: selectedSymbol || "EURUSD",
+          interval: "D",
+          timezone: "Etc/UTC",
+          theme: "light",
+          style: "1",
+          locale: "en",
+          allow_symbol_change: true,
+          calendar: false,
+          support_host: "https://www.tradingview.com",
+        },
+      },
+      {
+        id: "company-profile",
+        name: "Company Profile",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-symbol-profile.js",
+        config: {
+          autosize: true,
+          width: "100%",
+          height: "100%",
+          colorTheme: "light",
+          isTransparent: true,
+          symbol: selectedSymbol || "EURUSD",
+          locale: "en",
+        },
+      },
+      {
+        id: "technical-analysis",
+        name: "Technical Analysis",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js",
+        config: {
+          autosize: true,
+          interval: "15m",
+          width: "100%",
+          isTransparent: true,
+          height: "150%",
+          symbol: selectedSymbol || "EURUSD",
+          showIntervalTabs: true,
+          displayMode: "single",
+          locale: "en",
+          colorTheme: "light",
+        },
+      },
+      {
+        id: "top-stories",
+        name: "Top Stories",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-timeline.js",
+        config: {
+          autosize: true,
+          feedMode: "symbol",
+          symbol: selectedSymbol || "EURUSD",
+          colorTheme: "light",
+          isTransparent: true,
+          displayMode: "regular",
+          width: "100%",
+          height: "100%",
+          locale: "en",
+        },
+      },
+      {
+        id: "economic-calendar",
+        name: "Economic Calendar",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-economic-calendar.js",
+        config: {
+          autosize: true,
+          width: "100%",
+          height: "100%",
+          colorTheme: "light",
+          isTransparent: true,
+          locale: "en",
+        },
+      },
+      {
+        id: "forex-cross-rates",
+        name: "Forex Cross Rates",
+        scriptSrc: "https://s3.tradingview.com/external-embedding/embed-widget-forex-cross-rates.js",
+        config: {
+          autosize: true,
+          width: "100%",
+          height: "100%",
+          colorTheme: "light",
+          isTransparent: true,
+          locale: "en",
+        },
+      },
     ],
   };
 
-  const controls = widgetToggleMapping[activeCategory] || [];
+  const tabs = widgetToggleMapping[activeCategory] || [];
+  const activeTab = tabs[activeTabIndex];
+  const activeConfig = activeTab
+    ? { scriptSrc: activeTab.scriptSrc, config: activeTab.config }
+    : null;
+
+  // We only want to add the single selected widget to the dashboard,
+  // clearing old widgets from the prior symbol if user picks a new symbol.
+  const handleAddToDashboard = () => {
+    if (!activeTab || !selectedSymbol) return;
+    
+    addWidget({
+      widgetType: activeTab.id,
+      symbol: selectedSymbol,
+      category: activeCategory,
+      name: activeTab.name,
+      scriptSrc: activeTab.scriptSrc,
+      config: { ...activeTab.config, symbol: selectedSymbol },
+      position: {
+        x: 0,
+        y: 0, // Changed from widgets.length * 100 to 0 since we don't have access to widgets here
+        width: 400,
+        height: 300,
+      },
+    });
+    
+    onAddToDashboard();
+  };
+  
+
+
   return (
-    <div className="mt-auto p-3 border-t border-gray-700">
-      <h3 className="text-sm font-semibold text-white mb-2">Widget Controls</h3>
-      <div className="flex flex-col gap-1">
-        {controls.map((ctrl) => (
+    <div className="flex flex-col w-full h-full">
+      {/* Top row: Tabs + "Add" + "Close" */}
+      <div className="flex items-center justify-between p-2 border-b border-gray-700">
+        {/* Tab row (make them smaller, e.g. text-xs) */}
+        <div className="flex space-x-1">
+          {tabs.map((tab, index) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTabIndex(index)}
+              className={`px-3 py-1 text-xs font-medium rounded-t-sm ${
+                index === activeTabIndex
+                  ? "bg-white text-gray-900"
+                  : "bg-gray-600 text-white"
+              }`}
+            >
+              {tab.name}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center space-x-2">
           <button
-            key={ctrl.id}
-            onClick={() =>
-              setWidgetVisibility((prev: Record<string, boolean>) => ({
-                ...prev,
-                [ctrl.id]: !prev[ctrl.id],
-              }))
-            }
-            className={`px-2 py-1 rounded text-xs ${
-              widgetVisibility[ctrl.id] ? "bg-blue-500 text-white" : "bg-gray-400 text-gray-800"
-            }`}
+            className="bg-gray-500 text-white px-2 py-1 text-xs rounded"
+            onClick={handleAddToDashboard}
           >
-            {ctrl.name}
+            Add to Dashboard
           </button>
-        ))}
+          <button
+            className="bg-gray-700 text-white px-2 py-1 text-xs rounded"
+            onClick={onClose}
+          >
+            X
+          </button>
+        </div>
+      </div>
+
+      {/* Widget preview area => fill the remaining height */}
+      <div className="flex-1 overflow-auto p-2 bg-gray-800">
+        {activeConfig && (
+          <WidgetPreview
+            scriptSrc={activeConfig.scriptSrc}
+            config={activeConfig.config}
+          />
+        )}
       </div>
     </div>
   );
 };
 
-const MobileSidebar = ({ onShowCalendar }: { onShowCalendar: () => void }) => {
-  const { open, setOpen } = useSidebar();
+// A simple preview that loads the TradingView script
+const WidgetPreview: React.FC<{
+  scriptSrc: string;
+  config: Record<string, any>;
+}> = ({ scriptSrc, config }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    let script: HTMLScriptElement | null = null;
+    let timeoutId: NodeJS.Timeout;
+
+    const loadWidget = () => {
+      try {
+        // Clear previous content
+        container.innerHTML = '';
+        setIsLoading(true);
+        setError(null);
+
+        // Create new script element
+        script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.async = true;
+        script.src = scriptSrc;
+        
+        // Safe config serialization
+        try {
+          script.innerHTML = JSON.stringify(config);
+        } catch (e) {
+          console.error('Config serialization error:', e);
+          script.innerHTML = '{}';
+        }
+
+        // Event handlers
+        script.onerror = () => {
+          setError('Failed to load widget. Please try again.');
+          setIsLoading(false);
+        };
+
+        script.onload = () => {
+          timeoutId = setTimeout(() => {
+            setIsLoading(false);
+          }, 300); // Small delay for smoother transition
+        };
+
+        container.appendChild(script);
+      } catch (err) {
+        console.error('Widget loading error:', err);
+        setError('Error loading widget');
+        setIsLoading(false);
+      }
+    };
+
+    // Debounce widget loading
+    const debounceTimer = setTimeout(loadWidget, 150);
+
+    return () => {
+      clearTimeout(debounceTimer);
+      clearTimeout(timeoutId);
+      
+      if (script && container.contains(script)) {
+        container.removeChild(script);
+      }
+      container.innerHTML = '';
+    };
+  }, [scriptSrc, config]);
+
   return (
-    <div className="md:hidden">
-      <div className="h-10 px-4 py-4 flex items-center justify-between bg-gray-900 dark:bg-gray-800 fixed top-0 left-0 w-full z-50 shadow-lg">
-        <IconMenu2 className="text-white cursor-pointer" onClick={() => setOpen(!open)} />
-      </div>
-      <AnimatePresence>
-        {open && (
-          <motion.div className="fixed h-full w-full inset-0 bg-gray-900 dark:bg-gray-800 p-4 z-50 flex flex-col overflow-y-auto">
-            <SidebarContent onShowCalendar={onShowCalendar} onLinkClick={() => setOpen(false)} />
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className="relative w-full h-full bg-white">
+      {/* Loading overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      )}
+
+      {/* Error state */}
+      {error && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white p-4 z-10">
+          <div className="text-red-500 text-center">
+            <IconAlertCircle className="mx-auto h-8 w-8" />
+            <p className="mt-2">{error}</p>
+            <button
+              onClick={() => {
+                setError(null);
+                setIsLoading(true);
+              }}
+              className="mt-3 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Widget container */}
+      <div
+        ref={containerRef}
+        className={`w-full h-full transition-opacity duration-200 ${
+          isLoading ? 'opacity-50' : 'opacity-100'
+        }`}
+      />
     </div>
   );
 };
+
 
 const SidebarContent = ({
   onShowCalendar,
@@ -306,16 +921,54 @@ const SidebarContent = ({
 }) => {
   const { open } = useSidebar();
   const navigate = useNavigate();
+
   const sidebarLinks: LinkItem[] = [
-    { label: "Forex", icon: <IconGraphFilled />, onClick: () => setSelectedMarket?.("forex"), onMouseEnter: () => onHover?.("forex") },
-    { label: "Crypto", icon: <IconCurrencyBitcoin />, onClick: () => setSelectedMarket?.("crypto"), onMouseEnter: () => onHover?.("crypto") },
-    { label: "Actions", icon: <IconActivity />, onClick: () => setSelectedMarket?.("stocks"), onMouseEnter: () => onHover?.("stocks") },
-    { label: "Commodities", icon: <IconComponents /> },
-    { label: "Bonds", icon: <IconDeviceHeartMonitorFilled />, onClick: () => setSelectedMarket?.("bonds"), onMouseEnter: () => onHover?.("bonds") },
-    { label: "Calendar", icon: <IconCalendar />, onClick: () => navigate("/calendar") },
-    { label: "News", icon: <IconNews />, onClick: () => navigate("/news") },
-    { label: "Settings", icon: <IconSettings />, onClick: () => navigate("/settings") },
+    {
+      label: "Forex",
+      icon: <IconGraphFilled />,
+      onClick: () => setSelectedMarket?.("forex"),
+      onMouseEnter: () => onHover?.("forex"),
+    },
+    {
+      label: "Crypto",
+      icon: <IconCurrencyBitcoin />,
+      onClick: () => setSelectedMarket?.("crypto"),
+      onMouseEnter: () => onHover?.("crypto"),
+    },
+    {
+      label: "Actions",
+      icon: <IconActivity />,
+      onClick: () => setSelectedMarket?.("stocks"),
+      onMouseEnter: () => onHover?.("stocks"),
+    },
+    {
+      label: "Commodities",
+      icon: <IconComponents />,
+      onClick: () => navigate("/commodities"),
+    },
+    {
+      label: "Bonds",
+      icon: <IconDeviceHeartMonitorFilled />,
+      onClick: () => setSelectedMarket?.("bonds"),
+      onMouseEnter: () => onHover?.("bonds"),
+    },
+    {
+      label: "Calendar",
+      icon: <IconCalendar />,
+      onClick: () => navigate("/calendar"),
+    },
+    {
+      label: "News",
+      icon: <IconNews />,
+      onClick: () => navigate("/news"),
+    },
+    {
+      label: "Settings",
+      icon: <IconSettings />,
+      onClick: () => navigate("/settings"),
+    },
   ];
+
   return (
     <div className="flex flex-col h-full text-white space-y-3 p-3">
       {sidebarLinks.map((link) => (
@@ -333,4 +986,4 @@ const SidebarContent = ({
   );
 };
 
-export default Sidebar;
+export default Sidebar; // or export default Sidebar if you prefer

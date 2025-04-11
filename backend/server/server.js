@@ -1,255 +1,437 @@
-import express from "express";
-import cors from "cors";
-import redis from "redis";
-import rateLimit from "express-rate-limit";
-import mysql from "mysql2"; // <-- NEW import for MySQL
-import { scrapeTradingViewSymbols } from "../scraper/SymbolsScraper.js";
-
-// Initialize Express app
+import express from 'express';
+import cors from 'cors';
+import { createClient } from 'redis';
+import mysql from 'mysql2/promise';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import os from 'os';
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Configuration
+const config = {
+  redis: {
+    url: process.env.REDIS_URL || 'redis://localhost:6379'
+  },
+  // Updated MySQL configuration for your remote database
+  mysql: {
+    host: "mysql-merlet.alwaysdata.net",
+    user: "merlet",
+    password: "IzysQ4141",
+    database: "merlet_288288288",
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+  },
+  jwt: {
+    secret: process.env.JWT_SECRET || 'your-secure-jwt-secret',
+    expiresIn: '1h'
+  }
+};
+
+// Initialize Redis with error handling
+let redisClient;
+try {
+  redisClient = createClient(config.redis);
+  redisClient.on('error', err => console.error('Redis Error:', err));
+  await redisClient.connect();
+  console.log('✅ Connected to Redis');
+} catch (err) {
+  console.error('❌ Failed to connect to Redis:', err);
+  // Fallback in-memory cache
+  redisClient = {
+    get: async () => null,
+    set: async () => {},
+    setEx: async () => {},
+    quit: async () => {}
+  };
+}
+
+// Initialize MySQL with error handling
+let dbPool;
+try {
+  dbPool = mysql.createPool(config.mysql);
+  await dbPool.query('SELECT 1');
+  console.log('✅ Connected to MySQL');
+} catch (err) {
+  console.error('❌ Failed to connect to MySQL:', err);
+  // Fallback in-memory storage
+  let symbols = [];
+  let users = []; // For login functionality fallback
+  dbPool = {
+    query: async (sql, values) => {
+      if (sql.includes('SELECT * FROM financial_symbols')) return [symbols];
+      if (sql.includes('SELECT * FROM users')) return [users];
+      if (sql.includes('TRUNCATE')) {
+        symbols = [];
+        return [];
+      }
+      if (sql.includes('INSERT INTO financial_symbols')) {
+        symbols.push(...values[0].map(v => ({
+          id: v[0], symbol: v[1], name: v[2], type: v[3], exchange: v[4]
+        })));
+        return [];
+      }
+      if (sql.includes('INSERT INTO users')) {
+        users.push({
+          id: values[0][0],
+          username: values[0][1],
+          password_hash: values[0][2]
+        });
+        return [];
+      }
+      return [];
+    },
+    end: async () => {}
+  };
+}
+
+// Import symbol scraper
+let symbolScraper;
+try {
+  const module = await import('../scraper/SymbolsScraper.js');
+  symbolScraper = module.scrapeFinancialSymbols;
+  console.log('✅ Symbol scraper loaded successfully');
+} catch (err) {
+  console.error('❌ Failed to load symbol scraper:', err);
+  process.exit(1);
+}
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// Redis client for caching
-const redisClient = redis.createClient();
-
-// Handle Redis connection errors
-redisClient.on("error", (err) => console.error("Redis error:", err));
-
-// Connect to Redis
-redisClient
-  .connect()
-  .then(() => {
-    console.log("✅ Connected to Redis");
-  })
-  .catch((err) => {
-    console.error("❌ Failed to connect to Redis:", err);
-  });
-
-// Rate limiter
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-});
-app.use(limiter);
-
-// ▼▼ NEW: MySQL Database connection for login ▼▼
-const db = mysql.createConnection({
-  host: "mysql-merlet.alwaysdata.net",
-  user: "merlet",
-  password: "IzysQ4141",
-  database: "merlet_288288288",
-});
-db.connect((err) => {
-  if (err) {
-    console.error("❌ Error connecting to MySQL:", err);
-  } else {
-    console.log("✅ Connected to MySQL for login");
-  }
-});
-// ▲▲ NEW: MySQL Database connection for login ▲▲
-
-// Store scraped symbols in memory (fallback if Redis fails)
-let scrapedSymbols = {};
-
-// Pre-fetch symbols every 5 minutes
-const preFetchSymbols = () => {
-  const categories = ["forex", "crypto", "stocks", "bonds"];
-  categories.forEach((category) => {
-    scrapeTradingViewSymbols(category, (symbols) => {
-      const cacheKey = `symbols:${category}`;
-
-      // Cache ALL symbols in Redis
-      redisClient
-        .setEx(cacheKey, 300, JSON.stringify(symbols))
-        .then(() =>
-          console.log(`📦 Cached ${symbols.length} symbols for ${category}`)
+// Database operations
+const symbolService = {
+  async init() {
+    try {
+      // Create symbols table if not exists
+      await dbPool.query(`
+        CREATE TABLE IF NOT EXISTS financial_symbols (
+          id VARCHAR(50) PRIMARY KEY,
+          symbol VARCHAR(20) NOT NULL,
+          name VARCHAR(100) NOT NULL,
+          type VARCHAR(20),
+          exchange VARCHAR(20),
+          last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         )
-        .catch((err) =>
-          console.error(`❌ Failed to cache symbols for ${category}:`, err)
-        );
+      `);
+      
+      // Create users table if not exists
+      await dbPool.query(`
+        CREATE TABLE IF NOT EXISTS users (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          username VARCHAR(255) NOT NULL UNIQUE,
+          password_hash VARCHAR(255) NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      
+      console.log('✅ Database tables initialized');
+    } catch (err) {
+      console.error('❌ Failed to initialize database tables:', err);
+      throw err;
+    }
+  },
 
-      // Ensure scrapedSymbols is an array
-      if (!Array.isArray(scrapedSymbols[category])) {
-        scrapedSymbols[category] = [];
-      }
+  async getAllSymbols() {
+    try {
+      const [symbols] = await dbPool.query('SELECT * FROM financial_symbols');
+      return symbols;
+    } catch (err) {
+      console.error('❌ Failed to get symbols:', err);
+      throw err;
+    }
+  },
 
-      // Add ALL symbols to scrapedSymbols
-      scrapedSymbols[category] = symbols;
-    });
-  });
+  async refreshSymbols() {
+    try {
+      const symbols = await symbolScraper();
+      await dbPool.query('TRUNCATE TABLE financial_symbols');
+      const values = symbols.map(s => [s.id, s.symbol, s.name, s.type, s.exchange]);
+      await dbPool.query(
+        'INSERT INTO financial_symbols (id, symbol, name, type, exchange) VALUES ?',
+        [values]
+      );
+      return symbols;
+    } catch (err) {
+      console.error('❌ Failed to refresh symbols:', err);
+      throw err;
+    }
+  }
 };
 
-// Start pre-fetching on server start and every 5 minutes
-preFetchSymbols();
-setInterval(preFetchSymbols, 5 * 60 * 1000);
+// Authentication service
+const authService = {
+  /**
+   * Authenticates a user and returns a JWT token
+   * @param {string} userLogin - User's login ID
+   * @param {string} passLogin - User's password
+   * @returns {Promise<{token: string, user: {id: number, userLogin: string}}>}
+   * @throws {Error} If authentication fails
+   */
+  async login(userLogin, passLogin) {
+    try {
+      // Validate input
+      if (!userLogin?.trim()) throw new Error('Login ID is required');
+      if (!passLogin?.trim()) throw new Error('Password is required');
 
-// SSE endpoint for streaming symbols
-app.get("/api/symbols/stream", (req, res) => {
-  const { category } = req.query;
-  console.log("🔗 New SSE connection for category:", category);
-
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-
-  // Ensure scrapedSymbols is an array
-  if (!Array.isArray(scrapedSymbols[category])) {
-    scrapedSymbols[category] = [];
-  }
-
-  // Trigger scraping for the new category
-  scrapeTradingViewSymbols(category, (symbols) => {
-    console.log("📦 Scraped symbols:", symbols.length);
-
-    // Ensure no duplicates
-    const uniqueSymbols = symbols.filter((symbol) => {
-      const key = `${symbol.symbol}-${symbol.exchange}`;
-      return !scrapedSymbols[category].some(
-        (s) => `${s.symbol}-${s.exchange}` === key
+      // Find user
+      const [users] = await dbPool.query(
+        'SELECT id, userLogin, passLogin FROM Login WHERE userLogin = ? LIMIT 1',
+        [userLogin.trim()]
       );
-    });
 
-    console.log("📦 Unique symbols to send:", uniqueSymbols.length);
+      if (!users.length) {
+        console.warn(`Failed login attempt for: ${userLogin}`);
+        throw new Error('Invalid credentials');
+      }
 
-    // Add new symbols to scrapedSymbols
-    scrapedSymbols[category] = [
-      ...scrapedSymbols[category],
-      ...uniqueSymbols,
-    ];
+      const user = users[0];
+      let passwordValid = false;
 
-    // Send ALL symbols to the frontend
-    if (symbols.length > 0) {
-      console.log("📤 Sending symbols to frontend via SSE...");
-      res.write(`data: ${JSON.stringify(symbols)}\n\n`);
-      console.log("📦 Sent symbols to the frontend:", symbols.length);
-    }
-  }).catch((error) => {
-    console.error("❌ Error during scraping:", error);
-    res.write(`data: ${JSON.stringify({ error: "Failed to scrape symbols" })}\n\n`);
-  });
+      // Check if password is hashed (bcrypt format)
+      const isHashed = user.passLogin.startsWith('$2a$') || 
+                      user.passLogin.startsWith('$2b$');
 
-  // Cleanup on client disconnect
-  req.on("close", () => {
-    console.log("Client disconnected from SSE stream");
-  });
-});
+      // Password comparison
+      if (isHashed) {
+        passwordValid = await bcrypt.compare(passLogin, user.passLogin);
+      } else {
+        // Plaintext fallback (with auto-upgrade)
+        passwordValid = passLogin === user.passLogin;
+        if (passwordValid) {
+          await this.upgradePassword(user.id, passLogin);
+        }
+      }
 
-// API Route: Receive symbol batches
-app.post("/api/symbols/batch", (req, res) => {
-  try {
-    const { batch, category } = req.body;
+      if (!passwordValid) {
+        console.warn(`Password mismatch for: ${userLogin}`);
+        throw new Error('Invalid credentials');
+      }
 
-    if (!batch || !Array.isArray(batch) || !category) {
-      return res
-        .status(400)
-        .json({ error: "Invalid batch data or category." });
-    }
+      // Generate JWT token
+      const token = this.generateToken(user);
 
-    if (!Array.isArray(scrapedSymbols[category])) {
-      scrapedSymbols[category] = [];
-    }
-
-    // Filter out duplicates
-    const uniqueBatch = batch.filter((symbol) => {
-      const key = `${symbol.symbol}-${symbol.exchange}`;
-      return !scrapedSymbols[category].some(
-        (s) => `${s.symbol}-${s.exchange}` === key
-      );
-    });
-
-    // Add the unique batch
-    scrapedSymbols[category] = [
-      ...scrapedSymbols[category],
-      ...uniqueBatch,
-    ];
-    console.log(
-      `📦 Received batch. Total symbols for ${category}: ${scrapedSymbols[category].length}`
-    );
-
-    res
-      .status(200)
-      .json({ success: true, totalSymbols: scrapedSymbols[category].length });
-  } catch (error) {
-    console.error("❌ Error processing symbol batch:", error);
-    res.status(500).json({ error: "Internal server error. Please try again later." });
-  }
-});
-
-// API Route: Get symbols by category
-app.get("/api/symbols", async (req, res) => {
-  try {
-    const { category } = req.query;
-
-    if (!category) {
-      return res.status(400).json({ error: "Category is required." });
-    }
-
-    const cacheKey = `symbols:${category}`;
-    // Check Redis
-    const cachedData = await redisClient.get(cacheKey);
-    if (cachedData) {
-      const symbols = JSON.parse(cachedData);
-      console.log(`📦 Total symbols in Redis for ${category}: ${symbols.length}`);
-      return res.json({ symbols });
-    }
-
-    // Fallback to in-memory
-    if (scrapedSymbols[category]) {
-      console.log(
-        `📦 Total symbols in memory for ${category}: ${scrapedSymbols[category].length}`
-      );
-      return res.json({ symbols: scrapedSymbols[category] });
-    }
-
-    // If no cache, scrape
-    const symbols = await new Promise((resolve, reject) => {
-      scrapeTradingViewSymbols(category, (scraped) => {
-        resolve(scraped);
+      console.log(`Successful login for: ${userLogin}`);
+      return {
+        token,
+        user: {
+          id: user.id,
+          userLogin: user.userLogin
+        }
+      };
+    } catch (err) {
+      console.error('Login error:', {
+        user: userLogin,
+        error: err.message,
+        timestamp: new Date().toISOString()
       });
+      throw err;
+    }
+  },
+
+  /**
+   * Registers a new user with secure password hashing
+   * @param {string} userLogin - New login ID
+   * @param {string} passLogin - New password
+   * @returns {Promise<{id: number, userLogin: string}>}
+   * @throws {Error} If registration fails
+   */
+  async register(userLogin, passLogin) {
+    try {
+      // Validate input
+      if (!userLogin?.trim()) throw new Error('Login ID is required');
+      if (!passLogin?.trim()) throw new Error('Password is required');
+      if (passLogin.length < 8) throw new Error('Password must be at least 8 characters');
+      if (userLogin.length < 3) throw new Error('Login ID must be at least 3 characters');
+
+      // Check for existing user
+      const [existing] = await dbPool.query(
+        'SELECT id FROM Login WHERE userLogin = ? LIMIT 1',
+        [userLogin.trim()]
+      );
+
+      if (existing.length) {
+        throw new Error('Login ID already exists');
+      }
+
+      // Hash password with strong cost factor
+      const passwordHash = await bcrypt.hash(passLogin, 12);
+
+      // Create new user
+      const [result] = await dbPool.query(
+        'INSERT INTO Login (userLogin, passLogin) VALUES (?, ?)',
+        [userLogin.trim(), passwordHash]
+      );
+
+      console.log(`New user registered: ${userLogin}`);
+      return {
+        id: result.insertId,
+        userLogin: userLogin.trim()
+      };
+    } catch (err) {
+      console.error('Registration error:', {
+        user: userLogin,
+        error: err.message,
+        timestamp: new Date().toISOString()
+      });
+      throw err;
+    }
+  },
+
+  /**
+   * Upgrades plaintext password to hashed version
+   * @private
+   */
+  async upgradePassword(userId, plainPassword) {
+    const hash = await bcrypt.hash(plainPassword, 12);
+    await dbPool.query(
+      'UPDATE Login SET passLogin = ? WHERE id = ?',
+      [hash, userId]
+    );
+    console.log(`Upgraded password for user ${userId} to hashed format`);
+  },
+
+  /**
+   * Generates JWT token
+   * @private
+   */
+  generateToken(user) {
+    return jwt.sign(
+      {
+        userId: user.id,
+        userLogin: user.userLogin,
+        iat: Math.floor(Date.now() / 1000),
+        role: 'user' // Add any additional claims
+      },
+      config.jwt.secret,
+      {
+        expiresIn: config.jwt.expiresIn,
+        algorithm: 'HS256'
+      }
+    );
+  }
+};
+
+// Routes
+app.get('/api/symbols', async (req, res) => {
+  try {
+    const symbols = await symbolService.getAllSymbols();
+    res.json({ symbols });
+  } catch (err) {
+    res.status(500).json({ 
+      error: 'Failed to fetch symbols',
+      details: err.message
+    });
+  }
+});
+
+app.post('/api/symbols/refresh', async (req, res) => {
+  try {
+    const symbols = await symbolService.refreshSymbols();
+    res.json({ 
+      success: true, 
+      count: symbols.length,
+      message: `Successfully refreshed ${symbols.length} symbols`
+    });
+  } catch (err) {
+    res.status(500).json({ 
+      error: 'Failed to refresh symbols',
+      details: err.message
+    });
+  }
+});
+
+// Authentication routes
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+    
+    const authData = await authService.login(username, password);
+    res.json(authData);
+  } catch (err) {
+    res.status(401).json({ 
+      error: 'Authentication failed',
+      details: err.message
+    });
+  }
+});
+
+app.post('/api/register', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+    
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    
+    const user = await authService.register(username, password);
+    res.json({ 
+      success: true,
+      user
+    });
+  } catch (err) {
+    res.status(400).json({ 
+      error: 'Registration failed',
+      details: err.message
+    });
+  }
+});
+
+// Initialize and start server
+async function startServer() {
+  try {
+    // Initialize database first
+    await symbolService.init();
+    
+    // Start the server
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server accessible via:
+      - http://localhost:${PORT}
+      - http://127.0.0.1:${PORT}
+      - Your local IP: http://${getLocalIp()}:${PORT}`);
     });
 
-    console.log(`📦 Total symbols scraped for ${category}: ${symbols.length}`);
-    return res.json({ symbols });
-  } catch (error) {
-    console.error(`❌ Error fetching TradingView symbols:`, error);
-    res
-      .status(500)
-      .json({ error: "Internal server error. Please try again later." });
-  }
-});
-
-// ▼▼ NEW: Add the /login route with MySQL verification ▼▼
-app.post("/login", (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res
-      .status(400)
-      .json({ message: "Username and password are required" });
-  }
-
-  const query = "SELECT * FROM Login WHERE userLogin = ? AND passLogin = ?";
-  db.query(query, [username, password], (err, results) => {
-    if (err) {
-      console.error("❌ Error during login query:", err);
-      return res.status(500).json({ message: "Database error" });
+    function getLocalIp() {
+      return Object.values(os.networkInterfaces())
+        .flat()
+        .find(i => i.family === 'IPv4' && !i.internal)?.address;
     }
+    
+    // Initial data load (in background)
+    symbolService.refreshSymbols()
+      .then(symbols => console.log(`✅ Loaded ${symbols.length} symbols`))
+      .catch(err => console.error('⚠️ Initial symbol load failed:', err));
+    
+    return server;
+  } catch (err) {
+    console.error('❌ Server initialization failed:', err);
+    process.exit(1);
+  }
+}
 
-    if (results.length > 0) {
-      return res.status(200).json({ message: "Login successful" });
-    } else {
-      return res
-        .status(401)
-        .json({ message: "Invalid username or password" });
-    }
-  });
-});
-// ▲▲ NEW: Add the /login route with MySQL verification ▲▲
 
 // Start the server
-app.listen(PORT, () =>
-  console.log(`🚀 Server running on http://localhost:${PORT}`)
-);
+startServer();
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  try {
+    await redisClient.quit();
+    await dbPool.end();
+    console.log('🛑 Server shutdown gracefully');
+    process.exit(0);
+  } catch (err) {
+    console.error('❌ Error during shutdown:', err);
+    process.exit(1);
+  }
+});

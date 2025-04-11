@@ -1,5 +1,5 @@
 import puppeteer from "puppeteer";
-
+import mysql from "mysql2/promise";
 // Mapping of categories to their respective selectors
 const CATEGORY_SELECTORS = {
   forex: "#symbol-search-tabs button#forex",
@@ -8,6 +8,12 @@ const CATEGORY_SELECTORS = {
   bonds: "#symbol-search-tabs button#bond",
   actions: "#symbol-search-tabs button#stocks", // Same as stocks
   commodities: null, // Not handled yet
+};
+const dbConfig = {
+  host: "mysql-merlet.alwaysdata.net",
+  user: "merlet",
+  password: "IzysQ4141",
+  database: "merlet_288288288"
 };
 
 // Helper function to scrape symbols from the current page
@@ -62,6 +68,8 @@ export const scrapeTradingViewSymbols = async (category, onSymbolsScraped) => {
   if (!CATEGORY_SELECTORS[category]) {
     throw new Error(`Invalid category: ${category}`);
   }
+
+  const db = await mysql.createConnection(dbConfig);
 
   const url = "https://www.tradingview.com/";
   const browser = await puppeteer.launch({
@@ -151,6 +159,23 @@ export const scrapeTradingViewSymbols = async (category, onSymbolsScraped) => {
     }
 
     const finalSymbols = Array.from(uniqueSymbols.values());
+    // Store in database
+    const values = finalSymbols.map(s => [
+      s.symbol, 
+      s.description, 
+      s.exchange, 
+      category
+    ]);
+    
+    await db.query(
+      `INSERT INTO symbols (symbol, description, exchange, category)
+       VALUES ?
+       ON DUPLICATE KEY UPDATE
+       description = VALUES(description),
+       exchange = VALUES(exchange),
+       last_updated = CURRENT_TIMESTAMP`,
+      [values]
+    );
     console.log(`✅ Finished scraping. Total unique symbols: ${finalSymbols.length}`);
     return finalSymbols;
   } catch (error) {
@@ -158,5 +183,22 @@ export const scrapeTradingViewSymbols = async (category, onSymbolsScraped) => {
     return [];
   } finally {
     await browser.close();
+    await db.end();
+
+  }
+};
+export const scrapeFinancialSymbols = async () => {
+  try {
+    const symbols = await scrapeTradingViewSymbols('stocks', null);
+    return symbols.map(s => ({
+      id: `${s.exchange}:${s.symbol}`,
+      symbol: s.symbol,
+      name: s.description,
+      type: 'stock',
+      exchange: s.exchange
+    }));
+  } catch (error) {
+    console.error('Error in scrapeFinancialSymbols:', error);
+    return [];
   }
 };
