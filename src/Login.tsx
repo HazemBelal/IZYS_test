@@ -99,6 +99,8 @@ const Login = () => {
       }
 
       localStorage.setItem("authToken", data.token);
+
+      
       navigate("/dashboard");
     } catch (error) {
       const errorMessage = getErrorMessage(error);

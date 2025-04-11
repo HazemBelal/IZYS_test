@@ -175,44 +175,41 @@ const authService = {
       // Validate input
       if (!userLogin?.trim()) throw new Error('Login ID is required');
       if (!passLogin?.trim()) throw new Error('Password is required');
-
+  
       // Find user
       const [users] = await dbPool.query(
         'SELECT id, userLogin, passLogin FROM Login WHERE userLogin = ? LIMIT 1',
         [userLogin.trim()]
       );
-
+  
       if (!users.length) {
         console.warn(`Failed login attempt for: ${userLogin}`);
         throw new Error('Invalid credentials');
       }
-
+  
       const user = users[0];
       let passwordValid = false;
-
+  
       // Check if password is hashed (bcrypt format)
       const isHashed = user.passLogin.startsWith('$2a$') || 
                       user.passLogin.startsWith('$2b$');
-
+  
       // Password comparison
       if (isHashed) {
         passwordValid = await bcrypt.compare(passLogin, user.passLogin);
       } else {
         // Plaintext fallback (with auto-upgrade)
         passwordValid = passLogin === user.passLogin;
-        if (passwordValid) {
-          await this.upgradePassword(user.id, passLogin);
-        }
       }
-
+  
       if (!passwordValid) {
         console.warn(`Password mismatch for: ${userLogin}`);
         throw new Error('Invalid credentials');
       }
-
-      // Generate JWT token
+  
+      // Generate JWT token (don't modify password field)
       const token = this.generateToken(user);
-
+  
       console.log(`Successful login for: ${userLogin}`);
       return {
         token,
@@ -230,7 +227,8 @@ const authService = {
       throw err;
     }
   },
-
+  
+  
   /**
    * Registers a new user with secure password hashing
    * @param {string} userLogin - New login ID
@@ -302,16 +300,17 @@ const authService = {
       {
         userId: user.id,
         userLogin: user.userLogin,
-        iat: Math.floor(Date.now() / 1000),
-        role: 'user' // Add any additional claims
+        iat: Math.floor(Date.now() / 1000),  // Issued at time
+        role: 'user'  // You can add additional claims here (e.g., user role)
       },
-      config.jwt.secret,
+      config.jwt.secret,  // JWT Secret (from config)
       {
-        expiresIn: config.jwt.expiresIn,
-        algorithm: 'HS256'
+        expiresIn: config.jwt.expiresIn,  // Token expiration time
+        algorithm: 'HS256'  // Algorithm for signing the token
       }
     );
   }
+  
 };
 
 // Routes
