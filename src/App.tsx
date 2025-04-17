@@ -1,4 +1,4 @@
-import React from "react";
+// src/App.tsx
 import { Routes, Route, Navigate } from "react-router-dom";
 import AuthLayout from "./layouts/AuthLayout";
 import DashboardLayout from "./layouts/DashboardLayout";
@@ -7,7 +7,6 @@ import Calendar from "./pages/dashboard/components/CalendarEconomic";
 import News from "./pages/dashboard/components/News";
 import BondsWidget from "./pages/dashboard/components/BondsWidget";
 import DashboardWidget from "./pages/dashboard/components/DashboardWidget";
-import Settings from "./pages/dashboard/components/Settings";
 import { WidgetVisibilityProvider } from "./pages/dashboard/components/WidgetVisibilityContext";
 import { DashboardWidgetsProvider } from "./context/DashboardWidgetsContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -57,15 +56,22 @@ const App = () => {
                 </ProtectedRoute>
               }
             />
+
+            {/* Settings Route now has a child */}
             <Route
               path="/settings"
               element={
                 <ProtectedRoute>
-                  <Settings />
+                  {/* Replace this with your actual Settings component */}
+                  <div className="p-4 text-white">
+                    <h1 className="text-2xl">Settings</h1>
+                    <p>Settings page coming soon.</p>
+                  </div>
                 </ProtectedRoute>
               }
             />
-            {/* Keep these routes for backward compatibility if needed, but they won't be primary */}
+
+            {/* Backward‐compatible symbol route */}
             <Route
               path="/dashboard/:category/:symbol"
               element={

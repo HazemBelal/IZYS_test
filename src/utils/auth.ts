@@ -1,10 +1,10 @@
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions, Secret } from 'jsonwebtoken';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
+const JWT_SECRET: Secret = process.env.JWT_SECRET || 'fallback-secret';
 const SALT_ROUNDS = 10;
 
 export const AuthService = {
@@ -20,7 +20,13 @@ export const AuthService = {
 
   // Generate JWT token
   generateToken(payload: object, expiresIn: string = '1h'): string {
-    return jwt.sign(payload, JWT_SECRET, { expiresIn });
+    // Construct options and assert its type as SignOptions
+    const options = {
+      algorithm: 'HS256',
+      expiresIn,            // string like '1h' or a number of seconds
+    } as SignOptions;
+
+    return jwt.sign(payload, JWT_SECRET, options);
   },
 
   // Verify JWT token

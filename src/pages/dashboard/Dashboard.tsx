@@ -1,9 +1,7 @@
-import React, { useState } from 'react';
+import { useState} from 'react';
 import { Sidebar } from './components/Sidebar';
 import { IconMenu2 } from '@tabler/icons-react';
 import logo from '@/assets/logo-site.png';
-import Calendar from '@/pages/dashboard/components/CalendarEconomic';
-import TradingViewWidgets from './components/TradingViewWidgets';
 
 const Dashboard = () => {
   // For testing, use a constant static symbol.
@@ -47,7 +45,6 @@ const Dashboard = () => {
         />
         <div className="flex-1 p-4">
           <main>
-            <TradingViewWidgets symbol={staticSymbol} />
           </main>
         </div>
       </div>

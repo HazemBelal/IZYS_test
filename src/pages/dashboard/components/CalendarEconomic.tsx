@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { IconTriangleFilled } from '@tabler/icons-react';
 
@@ -16,6 +16,11 @@ interface EconomicEvent {
   previous: string;
   previousClass?: string;
   previousTitle?: string;
+}
+
+// Define an interface for the API response.
+interface CalendarResponse {
+  events: EconomicEvent[];
 }
 
 const EconomicCalendar = () => {
@@ -37,7 +42,7 @@ const EconomicCalendar = () => {
     setLoading(true);
     setEvents([]); // Clear events before fetching new data
     try {
-      const response = await axios.get('http://localhost:5000/api/calendar', {
+      const response = await axios.get<CalendarResponse>('http://localhost:5000/api/calendar', {
         params: { timeframe, timezone: userTimezone },
       });
       setEvents(response.data.events || []); // Set new events or empty array if no events

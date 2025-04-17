@@ -12,6 +12,12 @@ const DashboardLayout: React.FC = () => {
     navigate("/login"); // Redirect to login page
   };
 
+  // Dummy handler for onShowCalendar
+  const handleShowCalendar = () => {
+    // You can implement calendar logic here; for now, we'll just navigate to a calendar route
+    navigate("/calendar");
+  };
+
   return (
     <div>
       {/* Top Header */}
@@ -26,7 +32,7 @@ const DashboardLayout: React.FC = () => {
 
       {/* Sidebar + Main Content */}
       <div className="flex pt-[64px]">
-        <Sidebar />
+        <Sidebar onShowCalendar={handleShowCalendar} />
         <main className="flex-grow p-4 ml-[70px]">
           <Outlet />
         </main>

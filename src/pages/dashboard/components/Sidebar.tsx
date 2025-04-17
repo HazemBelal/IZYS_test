@@ -9,7 +9,6 @@ import React, {
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
-  IconMenu2,
   IconGraphFilled,
   IconCurrencyBitcoin,
   IconActivity,
@@ -85,7 +84,7 @@ const sidebarVariants = {
 
 const DesktopSidebar = ({
   onShowCalendar,
-  onSymbolSelect,
+  
 }: {
   onShowCalendar: () => void;
   onSymbolSelect?: (symbol: string) => void;
@@ -105,8 +104,6 @@ const DesktopSidebar = ({
 
   // Controls the "widget slider" on the right
   const [widgetSliderOpen, setWidgetSliderOpen] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
@@ -167,55 +164,54 @@ const DesktopSidebar = ({
   }, [selectedMarket]);
   
   // Improved pagination with abort controller and status tracking
-  const loadMoreSymbols = useCallback(async () => {
-    if (!selectedMarket || !hasMore || loading) return;
+  // const loadMoreSymbols = useCallback(async () => {
+  //   if (!selectedMarket || !hasMore || loading) return;
   
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+  //   const controller = new AbortController();
+  //   const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
   
-    setLoading(true);
-    setError(null);
+  //   setLoading(true);
+  //   setError(null);
   
-    try {
-      const res = await fetch(
-        `http://localhost:5000/api/symbols?category=${selectedMarket}&page=${page + 1}&limit=50`,
-        { signal: controller.signal }
-      );
+  //   try {
+  //     const res = await fetch(
+  //       `http://localhost:5000/api/symbols?category=${selectedMarket}&page=${page + 1}&limit=50`,
+  //       { signal: controller.signal }
+  //     );
   
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+  //     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       
-      const data = await res.json();
+  //     const data = await res.json();
       
-      if (data.symbols.length === 0) {
-        setHasMore(false);
-      } else {
-        setSymbols(prev => {
-          // Deduplicate symbols
-          const existingKeys = new Set(prev.map(s => `${s.symbol}-${s.exchange}`));
-          const uniqueNewSymbols = data.symbols.filter(
-            (s: any) => !existingKeys.has(`${s.symbol}-${s.exchange}`)
-          );
-          return [...prev, ...uniqueNewSymbols];
-        });
-        setPage(p => p + 1);
-        setHasMore(data.symbols.length === 50); // Assume more if we got a full page
-      }
-    } catch (err) {
-      if ((err as Error).name !== 'AbortError') {
-        console.error("Failed to load more symbols:", err);
-        setError("Failed to load more symbols. Please try again.");
-      }
-    } finally {
-      clearTimeout(timeoutId);
-      setLoading(false);
-    }
-  }, [selectedMarket, page, hasMore, loading]);
+  //     if (data.symbols.length === 0) {
+  //       setHasMore(false);
+  //     } else {
+  //       setSymbols(prev => {
+  //         // Deduplicate symbols
+  //         const existingKeys = new Set(prev.map(s => `${s.symbol}-${s.exchange}`));
+  //         const uniqueNewSymbols = data.symbols.filter(
+  //           (s: any) => !existingKeys.has(`${s.symbol}-${s.exchange}`)
+  //         );
+  //         return [...prev, ...uniqueNewSymbols];
+  //       });
+  //       setPage(p => p + 1);
+  //       setHasMore(data.symbols.length === 50); // Assume more if we got a full page
+  //     }
+  //   } catch (err) {
+  //     if ((err as Error).name !== 'AbortError') {
+  //       console.error("Failed to load more symbols:", err);
+  //       setError("Failed to load more symbols. Please try again.");
+  //     }
+  //   } finally {
+  //     clearTimeout(timeoutId);
+  //     setLoading(false);
+  //   }
+  // }, [selectedMarket, page, hasMore, loading]);
   // On hover => fetch symbols
   const handleHover = useCallback((category: string) => {
     setSelectedMarket(category);
     setSymbols([]);
-    setPage(1); // Reset to first page
-    setHasMore(true); // Reset pagination
+
     setLoading(true);
     
     fetch(`http://localhost:5000/api/symbols?category=${category}&page=1&limit=50`)
@@ -225,7 +221,6 @@ const DesktopSidebar = ({
       })
       .then((data) => {
         setSymbols(data.symbols || []);
-        setHasMore(data.symbols.length === 50);
       })
       .catch((err) => {
         console.error("❌ Error fetching symbols:", err);
@@ -910,8 +905,6 @@ const WidgetPreview: React.FC<{
 
 
 const SidebarContent = ({
-  onShowCalendar,
-  onLinkClick,
   setSelectedMarket,
   onHover,
 }: SidebarProps & {
