@@ -30,12 +30,12 @@ import {
 import { scrapeForexFactoryRange } from '../scraper/calendarScraper.js';
 
 
-// 1) Grab your AlwaysData host/port
-const REDIS_HOST = process.env.REDIS_HOST || 'services-merlet.alwaysdata.net';
-const REDIS_PORT = Number(process.env.REDIS_PORT) || 8300;
-
-// 2) Build a valid IPv6 URL
-const REDIS_URL = `redis://[${REDIS_HOST}]:${REDIS_PORT}`;
+// 1) Use local Redis on your VPS (or override via ENV) 
+const REDIS_HOST = process.env.REDIS_HOST || '127.0.0.1'; 
+const REDIS_PORT = Number(process.env.REDIS_PORT) || 6379; 
+ 
+// 2) Build a standard Redis URL 
+const REDIS_URL = `redis://${REDIS_HOST}:${REDIS_PORT}`;
 
 // 3) Create the client, forcing IPv6
 const redisClient = createClient({
@@ -154,23 +154,24 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
-app.use(express.static(path.join(__dirname, '../frontend/dist'), {
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.js')) {
-      res.setHeader('Content-Type', 'application/javascript');
-    }
-  },
-}));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
-});
 app.use(express.json());
 
 // Set Content Security Policy (CSP) for news requests if needed
 app.use((req, res, next) => {
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self' https://*.investing.com; media-src 'self' https://*.investing.com data:; img-src 'self' https://*.investing.com data:; script-src 'self'; style-src 'self'"
+    [
+      "default-src 'self' https://*.investing.com",
+      "connect-src 'self' http://31.97.154.112:5000 https://*.investing.com",
+      "media-src 'self' https://*.investing.com data:",
+      "img-src 'self' https://*.investing.com data:",
+      "script-src 'self' https://s3.tradingview.com",
+      "script-src-elem 'self' https://s3.tradingview.com",
+      "style-src 'self' https://fonts.googleapis.com",
+      "style-src-elem 'self' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com data:",
+      "frame-src 'self' https://s3.tradingview.com https://tradingview-widget.com"
+    ].join('; ')
   );
   next();
 });
@@ -621,7 +622,18 @@ async function startServer() {
     process.exit(1);
   }
 }
-
+app.use(express.static(path.join(__dirname, '../../dist'), { 
+  setHeaders: (res, filePath) => { 
+    if (filePath.endsWith('.js')) { 
+      res.setHeader('Content-Type', 'application/javascript'); 
+    } 
+  }, 
+})); 
+ 
+// client-side routing catch-all (ignore /api/*) 
+app.get(/^\/(?!api\/).*/, (req, res) => { 
+  res.sendFile(path.join(__dirname, '../../dist/index.html')); 
+});
 startServer();
 
 // ==========================================================

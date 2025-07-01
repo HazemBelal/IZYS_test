@@ -6,7 +6,7 @@ import { createClient } from 'redis';
 import { loadCookies, formatCookies } from './cookieHelper.js';
 
 // Constants
-const FETCH_TIMEOUT = 1000000; // 10 seconds timeout for page load
+const FETCH_TIMEOUT = 60000 ; // 10 seconds timeout for page load
 const RETRY_DELAY = 10000;   // 10 seconds delay between retries
 const MAX_RETRIES = 3;       // Maximum number of retries for failed requests
 const NEWS_CACHE_TTL = 600;  // TTL for news list pages: 10 minutes
@@ -77,18 +77,29 @@ const CATEGORY_URLS = {
  */
 async function fetchWithTimeout(url, retries = MAX_RETRIES) {
   let browser = null;
+  // rotate proxies if configured
+  const proxyUrl = getNextProxy();
+
   try {
-    const launchOptions = {
+    // 1) launch Chrome under root
+    const args = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--single-process'
+    ];
+    if (proxyUrl) {
+      args.push(`--proxy-server=${proxyUrl}`);
+    }
+    browser = await puppeteer.launch({
       headless: true,
       defaultViewport: null,
-    };
-    const proxyUrl = getNextProxy();
-    if (proxyUrl) {
-      launchOptions.args = [`--proxy-server=${proxyUrl}`];
-    }
-    browser = await puppeteer.launch(launchOptions);
-    const page = await browser.newPage();
+      args
+    });
 
+    // 2) open a page and set headers / user agent
+    const page = await browser.newPage();
     await page.setUserAgent(getRandomUserAgent());
     await page.setExtraHTTPHeaders({
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
@@ -98,17 +109,18 @@ async function fetchWithTimeout(url, retries = MAX_RETRIES) {
       'Cache-Control': 'no-cache',
     });
 
-    // Optionally, set cookies if available.
+    // 3) optionally load saved cookies
     const cookies = loadCookies();
     if (cookies.length) {
       await page.setCookie(...cookies);
     }
 
+    // 4) navigate with timeout
     console.log(`Attempting to fetch URL: ${url}`);
     await page.goto(url, { waitUntil: 'networkidle2', timeout: FETCH_TIMEOUT });
     console.log(`Page loaded: ${url}`);
 
-    // Wait briefly and then dismiss the login popup if it appears.
+    // 5) dismiss any login popup
     await delay(500);
     const modal = await page.$('div[role="dialog"]');
     if (modal) {
@@ -119,13 +131,17 @@ async function fetchWithTimeout(url, retries = MAX_RETRIES) {
       console.log("No login popup detected; proceeding.");
     }
 
+    // 6) grab the HTML and return
     const html = await page.content();
     console.log(`Fetched content length: ${html.length}`);
     await browser.close();
     return { text: async () => html };
   } catch (error) {
+    // ensure Chrome is closed on error
     if (browser) await browser.close();
     console.error(`Error fetching ${url}:`, error.message);
+
+    // retry logic
     if (retries > 0) {
       console.log(`Retrying... attempts left: ${retries}`);
       await delay(RETRY_DELAY);

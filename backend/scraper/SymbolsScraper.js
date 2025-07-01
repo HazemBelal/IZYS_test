@@ -49,156 +49,121 @@ const scrollAndWaitForNewSymbols = async (page) => {
 };
 
 export const scrapeTradingViewSymbols = async (category, onSymbolsScraped) => {
-  if (!CATEGORY_SELECTORS[category]) {
-    throw new Error(`Invalid category: ${category}`);
-  }
-  
-  // Connect to database
+  // 1) Connect to database
   const db = await mysql.createConnection(dbConfig);
+
+  // 2) Launch headless Chrome with sandbox disabled
   const browser = await puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--single-process"
+    ]
   });
   const page = await browser.newPage();
-  
+
   try {
-    // Navigate to TradingView with retries.
-    let retries = 3;
-    while (retries > 0) {
-      try {
-        console.log("🌐 Navigating to TradingView...");
-        await page.goto("https://www.tradingview.com/", {
-          waitUntil: "networkidle2",
-          timeout: 60000
-        });
-        break;
-      } catch (error) {
-        retries--;
-        if (retries === 0) throw error;
-      }
-    }
-    
-    console.log("🔍 Waiting for search button...");
-    await page.waitForSelector(".js-header-search-button", { timeout: 30000 });
-    await page.click(".js-header-search-button");
-    await delay(1000);
-    
-    console.log("⏳ Waiting for search panel (#symbol-search-tabs)...");
-    await page.waitForSelector("#symbol-search-tabs", { timeout: 30000 });
-    console.log("✅ Search panel loaded");
-    
-    const catSelector = CATEGORY_SELECTORS[category];
-    console.log(`🏷️ Selecting category: ${category}`);
-    await page.waitForSelector(catSelector, { timeout: 30000 });
-    await page.evaluate((selector) => {
-      const btn = document.querySelector(selector);
-      if (btn) btn.click();
-    }, catSelector);
-    await delay(1000);
-    
-    console.log("⏳ Waiting for symbols list...");
-    await page.waitForSelector(".itemRow-oRSs8UQo, .itemRow", { timeout: 30000 });
-    console.log("✅ Symbols list detected");
-    
-    // --- New logic for updating only the given category ---
-    // Delete only existing symbols in this category.
+    // 3) Navigate directly to the symbols page
+    const url = `https://www.tradingview.com/markets/${category}/symbols/`;
+    console.log(`🌐 Navigating to TradingView (${url})…`);
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
+    await page.waitForSelector(".tv-data-table", { timeout: 60000 });
+
+    // 4) Clear old symbols for this category
     await db.query("DELETE FROM financial_symbols WHERE category = ?", [category]);
     console.log(`🧹 Cleared existing symbols for category: ${category}`);
-    
-    // --- End new logic ---
-    
-    // Set up a map to capture unique symbols and their DOM order.
-    const uniqueSymbols = new Map();
-    let prevNumSymbols = await page.evaluate(() =>
-      document.querySelectorAll(".itemRow-oRSs8UQo, .itemRow").length
-    );
-    let sameCount = 0;
-    const maxScrollAttempts = 20;
-    let scrollAttempt = 0;
-    
-    while (scrollAttempt < maxScrollAttempts) {
-      const newSymbols = await scrapeSymbolsFromPage(page, category);
-      newSymbols.forEach(symbol => {
-        const key = `${symbol.symbol}-${symbol.exchange}`;
-        if (!uniqueSymbols.has(key)) {
-          uniqueSymbols.set(key, symbol);
-        }
-      });
-      
-      const currentCount = await page.evaluate(() =>
-        document.querySelectorAll(".itemRow-oRSs8UQo, .itemRow").length
-      );
-      console.log(`Scraped ${uniqueSymbols.size} unique symbols so far (DOM count: ${currentCount})`);
-      
-      if (currentCount - prevNumSymbols < 5) {
-        sameCount++;
-      } else {
-        sameCount = 0;
-      }
-      prevNumSymbols = currentCount;
-      
-      if (sameCount >= 3) {
-        console.log("✅ No significant increase detected after several scrolls. Finishing scrolling.");
-        break;
-      }
-      
-      scrollAttempt++;
-      await scrollAndWaitForNewSymbols(page);
-      
+
+    // 5) Scroll until no more new rows appear
+    let lastHeight = 0;
+    let scrolls = 0;
+    while (true) {
+      const height = await page.evaluate("document.body.scrollHeight");
+      if (height === lastHeight || scrolls > 20) break;
+      lastHeight = height;
+      await page.evaluate("window.scrollTo(0, document.body.scrollHeight)");
+      await new Promise(r => setTimeout(r, 1500));
+      scrolls++;
       if (onSymbolsScraped) {
-        onSymbolsScraped(Array.from(uniqueSymbols.values()));
+        // report progress with whatever's visible so far
+        const partial = await page.$$eval(
+          ".tv-data-table__tbody .tv-data-table__row",
+          rows => rows.map(row => {
+            const cells = row.querySelectorAll(".tv-data-table__cell");
+            return {
+              symbol:      cells[0]?.innerText.trim(),
+              description: cells[1]?.innerText.trim(),
+              exchange:    cells[2]?.innerText.trim()
+            };
+          })
+        );
+        onSymbolsScraped(partial);
       }
     }
-    
-    // Capture the DOM order – the order in which the symbols were scraped.
-    const finalSymbols = Array.from(uniqueSymbols.values()).map((s, idx) => ({
-      ...s,
-      _domIndex: idx
-    }));
+
+    // 6) Extract final list with DOM order index
+    const finalSymbols = await page.$$eval(
+      ".tv-data-table__tbody .tv-data-table__row",
+      (rows) => rows.map((row, idx) => {
+        const cells = row.querySelectorAll(".tv-data-table__cell");
+        return {
+          symbol:      cells[0]?.innerText.trim(),
+          description: cells[1]?.innerText.trim(),
+          exchange:    cells[2]?.innerText.trim(),
+          _domIndex:   idx
+        };
+      })
+    );
     console.log(`✅ Finished scraping. Total unique symbols: ${finalSymbols.length}`);
-    
-    // Map scraped symbols for insertion into the table. Make sure your table has an "order_index" column.
+
+    // 7) Bulk upsert into MySQL
     const values = finalSymbols.map(s => [
-      `${s.exchange}:${s.symbol}`.replace(/\s+/g, ''),
+      `${s.exchange}:${s.symbol}`.replace(/\s+/g, ""),
       s.symbol,
-      s.symbol,            // Using symbol as default for name
+      s.symbol,
       s.description,
-      category === "crypto" ? "cryptocurrency" : (category === "forex" ? "currency" : "stock"),
+      category === "crypto" ? "cryptocurrency" :
+        (category === "forex" ? "currency" : "stock"),
       category,
       s.exchange,
       category === "forex" ? "USD" : "USDT",
-      "Global",            // Default country value
-      "General",           // Default sector value
-      "General",           // Default industry value
-      s._domIndex          // Order index from the page
+      "Global",
+      "General",
+      "General",
+      s._domIndex
     ]);
-    
+
     await db.query(
-      `INSERT INTO financial_symbols 
-       (id, symbol, name, description, type, category, exchange, currency, country, sector, industry, order_index)
+      `INSERT INTO financial_symbols
+         (id, symbol, name, description, type, category, exchange, currency, country, sector, industry, order_index)
        VALUES ?
        ON DUPLICATE KEY UPDATE
-         name = VALUES(name),
-         description = VALUES(description),
-         exchange = VALUES(exchange),
-         currency = VALUES(currency),
-         order_index = VALUES(order_index),
+         name         = VALUES(name),
+         description  = VALUES(description),
+         exchange     = VALUES(exchange),
+         currency     = VALUES(currency),
+         order_index  = VALUES(order_index),
          last_updated = CURRENT_TIMESTAMP`,
       [values]
     );
-    console.log(`💾 Saved ${finalSymbols.length} symbols into the 'financial_symbols' table for category: ${category}`);
-    
+    console.log(`💾 Saved ${finalSymbols.length} symbols into database for category: ${category}`);
+
     return finalSymbols;
+
   } catch (error) {
     console.error("❌ Error scraping TradingView:", error);
     return [];
   } finally {
+    // 8) Tear down
     await page.close();
     await browser.close();
     await db.end();
     console.log("🧹 Cleaned up scraping session");
   }
 };
+
 
 export const scrapeAll = async () => {
   const categories = ["forex", "crypto", "stocks", "bonds"];
