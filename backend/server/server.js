@@ -68,7 +68,7 @@ const config = {
   // **IMPORTANT**: point at the same URL above
   redis: { url: REDIS_URL },
   mysql: {
-    host: "mysql-merlet.alwaysdata.net",
+    host: process.env.MYSQL_HOST || "127.0.0.1",
     user: "merlet",
     password: "IzysQ4141",
     database: "merlet_288288288",
@@ -96,36 +96,8 @@ try {
   await dbPool.query('SELECT 1');
   console.log('✅ Connected to MySQL');
 } catch (err) {
-  console.error('❌ Failed to connect to MySQL:', err);
-  // Fallback in-memory storage (for symbols and login)
-  let symbols = [];
-  let users = [];
-  dbPool = {
-    query: async (sql, values) => {
-      if (sql.includes('SELECT * FROM financial_symbols')) return [symbols];
-      if (sql.includes('SELECT * FROM users')) return [users];
-      if (sql.includes('TRUNCATE')) {
-        symbols = [];
-        return [];
-      }
-      if (sql.includes('INSERT INTO financial_symbols')) {
-        symbols.push(...values[0].map(v => ({
-          id: v[0], symbol: v[1], name: v[2], type: v[3], exchange: v[4]
-        })));
-        return [];
-      }
-      if (sql.includes('INSERT INTO users')) {
-        users.push({
-          id: values[0][0],
-          username: values[0][1],
-          password_hash: values[0][2]
-        });
-        return [];
-      }
-      return [];
-    },
-    end: async () => {}
-  };
+  console.error('❌ Could not connect to MySQL – exiting:', err); 
+  process.exit(1);
 }
 
 // --------------------------
@@ -162,7 +134,7 @@ app.use((req, res, next) => {
     'Content-Security-Policy',
     [
       "default-src 'self' https://*.investing.com",
-      "connect-src 'self' http://31.97.154.112:5000 https://*.investing.com",
+      "connect-src 'self' http://31.97.154.112:5000 http://127.0.0.1:5000 https://*.investing.com",
       "media-src 'self' https://*.investing.com data:",
       "img-src 'self' https://*.investing.com data:",
       "script-src 'self' https://s3.tradingview.com",
@@ -170,7 +142,7 @@ app.use((req, res, next) => {
       "style-src 'self' https://fonts.googleapis.com",
       "style-src-elem 'self' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
-      "frame-src 'self' https://s3.tradingview.com https://tradingview-widget.com"
+      "frame-src 'self' https://*.tradingview.com https://tradingview-widget.com https://*.tradingview-widget.com"
     ].join('; ')
   );
   next();
@@ -231,52 +203,15 @@ const symbolService = {
 
   async refreshSymbols() {
     try {
-      const symbols = await symbolScraper.scrapeAll();
-      
-      if (!symbols || symbols.length === 0) {
-        throw new Error('No symbols were scraped - likely blocked by TradingView');
-      }
-  
-      // Clear entire table
-      await dbPool.query('TRUNCATE TABLE financial_symbols');
-      
-      if (symbols.length > 0) {
-        // Map and insert symbols. Adjust the array as needed.
-        const values = symbols.map(s => [
-          `${s.exchange}:${s.symbol}`.replace(/\s+/g, ''),
-          s.symbol,
-          s.symbol,
-          s.description,
-          s.category === "crypto" ? "cryptocurrency" : (s.category === "forex" ? "currency" : "stock"),
-          s.category,
-          s.exchange,
-          s.category === "forex" ? "USD" : "USDT",
-          "Global",
-          "General",
-          "General",
-          s._domIndex || 0
-        ]);
-        await dbPool.query(
-          `INSERT INTO financial_symbols 
-           (id, symbol, name, description, type, category, exchange, currency, country, sector, industry, order_index)
-           VALUES ?
-           ON DUPLICATE KEY UPDATE
-             name = VALUES(name),
-             description = VALUES(description),
-             exchange = VALUES(exchange),
-             currency = VALUES(currency),
-             order_index = VALUES(order_index),
-             last_updated = CURRENT_TIMESTAMP`,
-          [values]
-        );
-        
-        // Clear the cache for each category so fresh data is served next time.
-        const categories = ["forex", "crypto", "stocks", "bonds"];
-        for (const cat of categories) {
-          await redisClient.del(`symbols:${cat}`);
-        }
-      }
-      
+      // Delegate entirely to the JSON-scanner scraper, 
+      // which now upserts directly into MySQL. 
+      const symbols = await symbolScraper.scrapeAll(); 
+ 
+      // Bust Redis caches so the front-end sees the new data. 
+      for (const cat of ["forex","crypto","stocks","bonds","index","futures"]) { 
+        await redisClient.del(`symbols:${cat}`); 
+      } 
+ 
       return symbols;
     } catch (err) {
       console.error('❌ Failed to refresh symbols:', err);
@@ -306,13 +241,32 @@ const authService = {
       }
   
       const user = users[0];
-      let passwordValid = false;
-      const isHashed = user.passLogin.startsWith('$2a$') || user.passLogin.startsWith('$2b$');
+
+      // 1) Trim and normalize inputs
+      const reqPass = passLogin.trim();
+      const dbPass  = user.passLogin.trim();
+      
+      // 2) Debug‐log the exact strings & lengths
+      console.log(
+        "→ [login] reqPass:", JSON.stringify(reqPass), "len:", reqPass.length
+      );
+      console.log(
+        "→ [login] dbPass :", JSON.stringify(dbPass),  "len:", dbPass.length
+      );
+      
+      // 3) Compare, using bcrypt if the stored value is hashed
+      const isHashed = dbPass.startsWith('$2a$') || dbPass.startsWith('$2b$');
+      let passwordValid;
       if (isHashed) {
-        passwordValid = await bcrypt.compare(passLogin, user.passLogin);
+        passwordValid = await bcrypt.compare(reqPass, dbPass);
       } else {
-        passwordValid = passLogin === user.passLogin;
+        passwordValid = reqPass === dbPass;
       }
+      
+      console.log(
+        `→ bcrypt.compare returned:`, passwordValid
+      );
+      
       if (!passwordValid) {
         console.warn(`Password mismatch for: ${userLogin}`);
         throw new Error('Invalid credentials');
@@ -336,8 +290,8 @@ const authService = {
     try {
       if (!userLogin?.trim()) throw new Error('Login ID is required');
       if (!passLogin?.trim()) throw new Error('Password is required');
-      if (passLogin.length < 8) throw new Error('Password must be at least 8 characters');
-      if (userLogin.length < 3) throw new Error('Login ID must be at least 3 characters');
+      //if (passLogin.length < 8) throw new Error('Password must be at least 8 characters');
+      //if (userLogin.length < 3) throw new Error('Login ID must be at least 3 characters');
 
       const [existing] = await dbPool.query(
         'SELECT id FROM Login WHERE userLogin = ? LIMIT 1',
@@ -463,10 +417,16 @@ app.get('/api/symbols/stream', async (req, res) => {
 // Authentication Endpoints
 // ==========================================================
 app.post('/api/login', async (req, res) => {
+  console.log("← /api/login received:", req.body);
   try {
-    const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
-    const authData = await authService.login(username, password);
+    const { userLogin, passLogin } = req.body;
+    if (!userLogin || !passLogin) {
+      return res
+        .status(400)
+        .json({ error: 'userLogin and passLogin are required' });
+    }
+    // calls authService.login against your Login table
+    const authData = await authService.login(userLogin, passLogin);
     res.json(authData);
   } catch (err) {
     res.status(401).json({ error: 'Authentication failed', details: err.message });
@@ -477,7 +437,7 @@ app.post('/api/register', async (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
-    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    //if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
     const user = await authService.register(username, password);
     res.json({ success: true, user });
   } catch (err) {

@@ -1,0 +1,22 @@
+
+services:
+  db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: IzysQ4141
+      MYSQL_DATABASE: merlet_288288288
+    # Use a Docker named volume for MySQL data to allow proper initialization
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+  redis:
+    image: redis:6
+    ports:
+      - "6379:6379"
+
+volumes:
+  # Named volume for persisting MySQL data
+  db_data:
+

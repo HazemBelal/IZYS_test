@@ -7,11 +7,11 @@
     "node": ">=16"
   },
   "scripts": {
-    "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "nodemon --watch server --ext js,ts --exec \"node server/server.js\""
   },
   "dependencies": {
     "@tabler/icons-react": "^3.17.0",
@@ -63,6 +63,7 @@
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
     "globals": "^15.9.0",
+    "nodemon": "^3.1.10",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",
