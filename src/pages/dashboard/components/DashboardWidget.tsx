@@ -20,7 +20,7 @@ interface WidgetPosition {
 // }
 
 interface DashboardWidgetState {
-  id: string;
+  id: string | number;
   position: WidgetPosition;
   scriptSrc: string;
   config: Record<string, any>;
@@ -368,35 +368,53 @@ const clearUserCache = async () => {
 // };
 
 const DashboardWidget: React.FC = () => {
-  const { widgets, updateWidgetPosition, removeWidget } = useDashboardWidgets();
+  const { widgets, updateWidgetPosition, removeWidget, clearAllWidgets } = useDashboardWidgets();
   const { symbol } = useParams<{ symbol: string; category: string }>();
   const { widgetVisibility } = useWidgetVisibility();
-  const [isClearingCache, setIsClearingCache] = useState(false);
-  const [cacheStatus, setCacheStatus] = useState<string | null>(null);
-  // const widgetDefinitions = useMemo(() => {
-  //   return widgets.map(w => ({
-  //     id: w.id,
-  //     name: w.name,
-  //     scriptSrc: w.scriptSrc,
-  //     config: w.config,
-  //     widgetType: w.widgetType
-  //   }));
-  // }, [widgets.map(w => `${w.id}-${w.scriptSrc}-${JSON.stringify(w.config)}`).join('|')]);
+  const [isClearingDashboard, setIsClearingDashboard] = useState(false);
+  const [clearStatus, setClearStatus] = useState<string | null>(null);
 
-
-  const handleClearCache = async () => {
-    setIsClearingCache(true);
-    setCacheStatus(null);
-    
-    const success = await clearUserCache();
-    
-    setIsClearingCache(false);
-    setCacheStatus(success ? 'Cache cleared successfully!' : 'Failed to clear cache');
-    
-    if (success) {
-      setTimeout(() => window.location.reload(), 1000);
+  // Remove all widgets for the current user
+  const handleClearDashboard = async () => {
+    setIsClearingDashboard(true);
+    setClearStatus(null);
+    try {
+      const success = await clearAllWidgets();
+      setClearStatus(success ? 'Dashboard cleared!' : 'Failed to clear dashboard');
+    } catch (err) {
+      setClearStatus('Failed to clear dashboard');
+    } finally {
+      setIsClearingDashboard(false);
     }
   };
+
+  // Always show the Clear Only button, even if there are no widgets
+  const clearButton = (
+    <div className="absolute top-4 right-4 z-50">
+      <button
+        onClick={handleClearDashboard}
+        disabled={isClearingDashboard || widgets.length === 0}
+        className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors flex items-center"
+      >
+        {isClearingDashboard ? (
+          <>
+            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Clearing...
+          </>
+        ) : (
+          'Clear Dashboard'
+        )}
+      </button>
+      {clearStatus && (
+        <div className={`mt-1 text-xs ${clearStatus.includes('Failed') ? 'text-red-500' : 'text-green-500'}`}>
+          {clearStatus}
+        </div>
+      )}
+    </div>
+  );
 
   useEffect(() => {
     const scriptElements: HTMLScriptElement[] = [];
@@ -404,7 +422,7 @@ const DashboardWidget: React.FC = () => {
 
     const loadWidget = (widget: DashboardWidgetState) => {
       try {
-        const container = document.getElementById(widget.id);
+        const container = document.getElementById(widget.id as string);
         if (!container) return;
 
         widgetContainers.push(container);
@@ -418,7 +436,7 @@ const DashboardWidget: React.FC = () => {
         script.type = 'text/javascript';
         script.async = true;
         script.src = widget.scriptSrc;
-        script.dataset.widgetId = widget.id;
+        script.dataset.widgetId = String(widget.id);
         script.innerHTML = JSON.stringify({
           ...widget.config,
           symbol: widget.config.symbol || symbol,
@@ -465,48 +483,26 @@ const DashboardWidget: React.FC = () => {
     };
   }, [widgets, widgetVisibility, symbol]);
 
-  if (!symbol || widgets.length === 0) {
+  if (widgets.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-gray-500">No widgets to display</p>
+      <div className="relative w-full h-full bg-gray-100 min-h-screen">
+        {clearButton}
+        <div className="flex items-center justify-center h-full">
+          <p className="text-gray-500">No widgets to display</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="relative w-full h-full bg-gray-100 min-h-screen">
-      {/* Cache Clear Button */}
-      <div className="absolute top-4 right-4 z-50">
-        <button
-          onClick={handleClearCache}
-          disabled={isClearingCache}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors flex items-center"
-        >
-          {isClearingCache ? (
-            <>
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Clearing...
-            </>
-          ) : (
-            'Clear Cache'
-          )}
-        </button>
-        {cacheStatus && (
-          <div className={`mt-1 text-xs ${cacheStatus.includes('Failed') ? 'text-red-500' : 'text-green-500'}`}>
-            {cacheStatus}
-          </div>
-        )}
-      </div>
-
+      {clearButton}
       {/* Widgets */}
       {widgets
         .filter(widget => widgetVisibility[widget.widgetType] !== false)
         .map((widget) => (
           <Rnd
-            key={widget.id}
+            key={widget.id as string | number}
             default={widget.position}
             position={{ x: widget.position.x, y: widget.position.y }}
             size={{ width: widget.position.width, height: widget.position.height }}
@@ -560,7 +556,7 @@ const DashboardWidget: React.FC = () => {
                 className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center z-20 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
                 onClick={(e) => {
                   e.stopPropagation();
-                  removeWidget(widget.id);
+                  removeWidget(widget.id as string | number);
                 }}
                 aria-label={`Remove ${widget.name} widget`}
               >
@@ -569,10 +565,10 @@ const DashboardWidget: React.FC = () => {
 
               <div className="absolute top-8 bottom-0 left-0 right-0">
                 <div
-                  id={widget.id}
+                  id={String(widget.id)}
                   className="w-full h-full bg-white"
                 />
-                {!document.getElementById(widget.id)?.hasChildNodes() && (
+                {!document.getElementById(String(widget.id))?.hasChildNodes() && (
                   <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80">
                     <div className="animate-pulse text-gray-500 text-sm">
                       Loading {widget.name}...

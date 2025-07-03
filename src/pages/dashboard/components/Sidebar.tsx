@@ -23,6 +23,9 @@ import {
 import { useLocation } from "react-router-dom";
 import { useDashboardWidgets } from "../../../context/DashboardWidgetsContext";
 import { IconAlertCircle } from "@tabler/icons-react";
+import debounce from 'lodash.debounce';
+
+declare module 'lodash.debounce';
 
 interface LinkItem {
   label: string;
@@ -102,132 +105,73 @@ const DesktopSidebar = ({
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
 
+  // Pagination state for infinite scroll
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
+  // LoadingMore state for infinite scroll
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Show searching spinner above the table
+  const [searching, setSearching] = useState(false);
+
+  // Add a mapping from sidebar label to API category
+  const CATEGORY_LABEL_TO_API: Record<string, string> = {
+    Forex: 'forex',
+    Crypto: 'crypto',
+    Stocks: 'stocks',
+    Actions: 'actions',
+    Commodities: 'futures', // map Commodities to futures
+    Bonds: 'bonds',
+    Indices: 'indices',
+  };
+
+  // Fetch symbols paginated or search
+  const fetchSymbols = useCallback(async (page: number, category: string, query: string) => {
+    setLoading(true);
+    setError(null);
+    let url = "";
+    if (query) {
+      url = `/api/symbols/search?category=${category}&q=${encodeURIComponent(query)}`;
+    } else {
+      url = `/api/symbols/paginated?category=${category}&page=${page}&limit=50`;
+    }
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch symbols");
+      const data = await res.json();
+      if (query) {
+        setSymbols(data.symbols);
+        setHasMore(false);
+      } else {
+        setSymbols(prev => page === 1 ? data.symbols : [...prev, ...data.symbols]);
+        setHasMore(data.hasMore);
+      }
+    } catch (err) {
+      setError("Failed to fetch symbols. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Controls the "widget slider" on the right
   const [widgetSliderOpen, setWidgetSliderOpen] = useState(false);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  // SSE: load symbols for the chosen category
-  useEffect(() => {
-    if (!selectedMarket) return;
-  
-    let eventSource: EventSource | null = null;
-    let retryCount = 0;
-    const maxRetries = 3;
-    const retryDelay = 3000; // 3 seconds
-  
-    const connectToSSE = () => {
-      eventSource = new EventSource(
-        `http://localhost:5000/api/symbols/stream?category=${selectedMarket}`
-      );
-  
-      eventSource.onmessage = (event) => {
-        try {
-          const newSymbols = JSON.parse(event.data);
-          setSymbols((prev) => {
-            // Filter out duplicates before adding new symbols
-            const existingKeys = new Set(prev.map(s => `${s.symbol}-${s.exchange}`));
-            const uniqueNewSymbols = newSymbols.filter(
-              (s: any) => !existingKeys.has(`${s.symbol}-${s.exchange}`)
-            );
-            return [...prev, ...uniqueNewSymbols];
-          });
-          retryCount = 0; // Reset retry counter on successful message
-        } catch (error) {
-          console.error("Error parsing SSE data:", error);
-        }
-      };
-  
-      eventSource.onerror = () => {
-        if (eventSource) {
-          eventSource.close();
-        }
-        
-        if (retryCount < maxRetries) {
-          retryCount++;
-          console.log(`SSE connection lost. Retrying (${retryCount}/${maxRetries})...`);
-          setTimeout(connectToSSE, retryDelay);
-        } else {
-          console.error("Max SSE retries reached. Giving up.");
-          setError("Connection lost. Please refresh the page.");
-        }
-      };
-    };
-  
-    connectToSSE();
-  
-    return () => {
-      if (eventSource) {
-        eventSource.close();
-      }
-    };
-  }, [selectedMarket]);
-  
-  // Improved pagination with abort controller and status tracking
-  // const loadMoreSymbols = useCallback(async () => {
-  //   if (!selectedMarket || !hasMore || loading) return;
-  
-  //   const controller = new AbortController();
-  //   const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-  
-  //   setLoading(true);
-  //   setError(null);
-  
-  //   try {
-  //     const res = await fetch(
-  //       `http://localhost:5000/api/symbols?category=${selectedMarket}&page=${page + 1}&limit=50`,
-  //       { signal: controller.signal }
-  //     );
-  
-  //     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      
-  //     const data = await res.json();
-      
-  //     if (data.symbols.length === 0) {
-  //       setHasMore(false);
-  //     } else {
-  //       setSymbols(prev => {
-  //         // Deduplicate symbols
-  //         const existingKeys = new Set(prev.map(s => `${s.symbol}-${s.exchange}`));
-  //         const uniqueNewSymbols = data.symbols.filter(
-  //           (s: any) => !existingKeys.has(`${s.symbol}-${s.exchange}`)
-  //         );
-  //         return [...prev, ...uniqueNewSymbols];
-  //       });
-  //       setPage(p => p + 1);
-  //       setHasMore(data.symbols.length === 50); // Assume more if we got a full page
-  //     }
-  //   } catch (err) {
-  //     if ((err as Error).name !== 'AbortError') {
-  //       console.error("Failed to load more symbols:", err);
-  //       setError("Failed to load more symbols. Please try again.");
-  //     }
-  //   } finally {
-  //     clearTimeout(timeoutId);
-  //     setLoading(false);
-  //   }
-  // }, [selectedMarket, page, hasMore, loading]);
-  // On hover => fetch symbols
-  const handleHover = useCallback((category: string) => {
-    setSelectedMarket(category);
+  // On hover => fetch first page (reset scroll)
+  const handleHover = useCallback((categoryLabel: string) => {
+    const apiCategory = CATEGORY_LABEL_TO_API[categoryLabel] || categoryLabel;
+    setSelectedMarket(apiCategory);
     setSymbols([]);
-
-    setLoading(true);
-    
-    fetch(`http://localhost:5000/api/symbols?category=${category}&page=1&limit=50`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch symbols");
-        return res.json();
-      })
-      .then((data) => {
-        setSymbols(data.symbols || []);
-      })
-      .catch((err) => {
-        console.error("❌ Error fetching symbols:", err);
-        setError("Failed to fetch symbols. Please try again.");
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    setPage(1);
+    setHasMore(true);
+    setSearchQuery("");
+    fetchSymbols(1, apiCategory, "");
+    setTimeout(() => {
+      if (tableContainerRef.current) tableContainerRef.current.scrollTop = 0;
+    }, 0);
+  }, [fetchSymbols]);
 
   // Filter by search
   const filteredSymbols = symbols.filter(
@@ -250,6 +194,37 @@ const DesktopSidebar = ({
   const handleLogout = () => {
     localStorage.removeItem("authToken");
     navigate("/login");
+  };
+
+  // When fetching more symbols (pagination), use selectedMarket as API category
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (!hasMore || loading || loadingMore || searchQuery) return;
+    const container = e.currentTarget;
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    if (scrollHeight - scrollTop <= clientHeight + 10) {
+      setLoadingMore(true);
+      setTimeout(() => {
+        fetchSymbols(page + 1, selectedMarket!, "");
+        setPage(p => p + 1);
+        setLoadingMore(false);
+      }, 1000); // 1 second
+    }
+  }, [hasMore, loading, loadingMore, searchQuery, fetchSymbols, page, selectedMarket]);
+
+  const debouncedSearch = useRef(
+    debounce((value: string, selectedMarket: string) => {
+      setSearching(true);
+      fetchSymbols(1, selectedMarket, value).then(() => setSearching(false));
+    }, 400)
+  ).current;
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    setPage(1);
+    if (selectedMarket) {
+      debouncedSearch(value, selectedMarket);
+    }
   };
 
   return (
@@ -307,55 +282,109 @@ const DesktopSidebar = ({
                   type="text"
                   placeholder="Search symbols..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={handleSearch}
                   className="w-full px-4 py-2 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <IconSearch className="absolute right-3 top-3 text-gray-400" />
               </div>
               {loading && (
-              <div className="space-y-2">
-                {[...Array(10)].map((_, i) => (
-                  <div key={i} className="flex justify-between p-2 bg-gray-700 rounded animate-pulse">
-                    <div className="h-4 bg-gray-600 rounded w-1/4"></div>
-                    <div className="h-4 bg-gray-600 rounded w-1/2"></div>
-                    <div className="h-4 bg-gray-600 rounded w-1/6"></div>
-                  </div>
-                ))}
-              </div>
-            )}
-              {error && <div className="text-red-500 text-center">{error}</div>}
-
-              {!loading && !error && (
-                <div
-                  ref={tableContainerRef}
-                  className="overflow-y-auto flex-1 custom-scrollbar"
-                >
-                  <table className="w-full text-white">
-                    <thead>
-                      <tr className="bg-gray-700">
-                        <th className="px-4 py-2 text-left font-medium">Symbol</th>
-                        <th className="px-4 py-2 text-left font-medium">Description</th>
-                        <th className="px-4 py-2 text-left font-medium">Exchange</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredSymbols.map((symObj) => (
-                        <tr
-                          key={`${symObj.symbol}-${symObj.exchange}`}
-                          className="hover:bg-gray-700 transition-all duration-150 cursor-pointer"
-                          onClick={() => handleSymbolSelect(symObj.symbol)}
-                        >
-                          <td className="px-4 py-2 font-normal">{symObj.symbol}</td>
-                          <td className="px-4 py-2 font-normal">
-                            {symObj.description}
-                          </td>
-                          <td className="px-4 py-2 font-normal">{symObj.exchange}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="space-y-2">
+                  {[...Array(10)].map((_, i) => (
+                    <div key={i} className="flex justify-between p-2 bg-gray-700 rounded animate-pulse">
+                      <div className="h-4 bg-gray-600 rounded w-1/4"></div>
+                      <div className="h-4 bg-gray-600 rounded w-1/2"></div>
+                      <div className="h-4 bg-gray-600 rounded w-1/6"></div>
+                    </div>
+                  ))}
                 </div>
               )}
+              {error && <div className="text-red-500 text-center">{error}</div>}
+              <div
+                ref={tableContainerRef}
+                className="overflow-y-auto flex-1 custom-scrollbar"
+                onScroll={handleScroll}
+                style={{ maxHeight: 'calc(100vh - 200px)' }}
+              >
+                <table className="w-full text-white">
+                  <thead>
+                    <tr className="bg-gray-700">
+                      <th className="px-4 py-2 text-left font-medium">Symbol</th>
+                      <th className="px-4 py-2 text-left font-medium">Description</th>
+                      <th className="px-4 py-2 text-left font-medium">Exchange</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {symbols.map((symObj) => (
+                      <tr
+                        key={`${symObj.symbol}-${symObj.exchange}`}
+                        className="hover:bg-gray-700 transition-all duration-150 cursor-pointer"
+                        onClick={() => handleSymbolSelect(symObj.symbol)}
+                      >
+                        <td className="px-4 py-2 font-normal">{symObj.symbol}</td>
+                        <td className="px-4 py-2 font-normal">{symObj.description}</td>
+                        <td className="px-4 py-2 font-normal">{symObj.exchange}</td>
+                      </tr>
+                    ))}
+                    {!loading && !symbols.length && (
+                      <tr><td colSpan={3} className="text-center py-2">No symbols found.</td></tr>
+                    )}
+                    {/* TEMPORARY: Always show spinner for debugging */}
+                    <tr>
+                      <td colSpan={3} className="text-center py-4">
+                        <span className="loader"></span>
+                      </td>
+                    </tr>
+                    {loadingMore && (
+                      <tr>
+                        <td colSpan={3} style={{ padding: '16px 0' }}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            minHeight: 40
+                          }}>
+                            <img
+                              src="/spinner.svg"
+                              alt="Loading..."
+                              style={{
+                                width: '8vw',
+                                maxWidth: 40,
+                                minWidth: 24,
+                                height: 'auto',
+                                display: 'block',
+                                background: 'none'
+                              }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    {searching && (
+                      <tr>
+                        <td colSpan={3} style={{ padding: '16px 0' }}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            minHeight: 32
+                          }}>
+                            <img
+                              src="/spinner.svg"
+                              alt="Searching..."
+                              style={{
+                                width: 24,
+                                height: 24,
+                                display: 'block',
+                                background: 'none'
+                              }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </motion.div>
         )}
@@ -931,13 +960,14 @@ const SidebarContent = ({
     {
       label: "Actions",
       icon: <IconActivity />,
-      onClick: () => setSelectedMarket?.("stocks"),
-      onMouseEnter: () => onHover?.("stocks"),
+      onClick: () => setSelectedMarket?.("actions"),
+      onMouseEnter: () => onHover?.("actions"),
     },
     {
       label: "Commodities",
       icon: <IconComponents />,
-      onClick: () => navigate("/commodities"),
+      onClick: () => setSelectedMarket?.("futures"),
+      onMouseEnter: () => onHover?.("futures"),
     },
     {
       label: "Bonds",

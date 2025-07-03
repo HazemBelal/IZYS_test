@@ -43,8 +43,8 @@ const Login = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userLogin: username,  // match server’s req.body.userLogin
-          passLogin: password   // match server’s req.body.passLogin
+          userLogin: username,  // match server's req.body.userLogin
+          passLogin: password   // match server's req.body.passLogin
         })
       });
   
@@ -59,6 +59,7 @@ const Login = () => {
   
       const data = await response.json();
       localStorage.setItem("authToken", data.token);
+      window.dispatchEvent(new Event("authChanged"));
       navigate("/dashboard");
   
     } catch (err) {

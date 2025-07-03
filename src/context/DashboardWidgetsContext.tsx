@@ -9,7 +9,7 @@ export interface WidgetPosition {
 }
 
 export interface DashboardWidgetState {
-  id: string;
+  id: string | number;
   widgetType: string;
   symbol: string;
   category: string;
@@ -21,67 +21,154 @@ export interface DashboardWidgetState {
 
 interface DashboardWidgetsContextProps {
   widgets: DashboardWidgetState[];
-  addWidget: (widget: Omit<DashboardWidgetState, 'id'>) => void;
-  removeWidget: (id: string) => void;
-  updateWidgetPosition: (id: string, position: WidgetPosition) => void;
-  getWidgetDefinition?: (id: string) => DashboardWidgetState | undefined;
+  addWidget: (widget: Omit<DashboardWidgetState, 'id'>) => Promise<void>;
+  removeWidget: (id: string | number) => Promise<void>;
+  updateWidgetPosition: (id: string | number, position: WidgetPosition) => Promise<void>;
+  getWidgetDefinition?: (id: string | number) => DashboardWidgetState | undefined;
+  clearAllWidgets: () => Promise<boolean>;
 }
 
 const DashboardWidgetsContext = createContext<DashboardWidgetsContextProps | undefined>(undefined);
 
 export const DashboardWidgetsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const STORAGE_KEY = "dashboard-widgets-v3";
+  const [widgets, setWidgets] = useState<DashboardWidgetState[]>([]);
 
-  const [widgets, setWidgets] = useState<DashboardWidgetState[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch (error) {
-      console.error("Failed to parse stored widgets:", error);
-      return [];
-    }
-  });
+  // Helper to get JWT
+  const getToken = () => localStorage.getItem("authToken");
 
+  // Track auth token in state and update on login/logout
+  const [authToken, setAuthToken] = useState<string | null>(getToken());
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets));
-    } catch (error) {
-      console.error("Failed to save widgets:", error);
-    }
-  }, [widgets]);
-
-  const addWidget = (widget: Omit<DashboardWidgetState, 'id'>) => {
-    const newWidget: DashboardWidgetState = {
-      ...widget,
-      id: `widget-${widget.widgetType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    const updateToken = () => setAuthToken(getToken());
+    window.addEventListener('storage', updateToken);
+    window.addEventListener('authChanged', updateToken);
+    return () => {
+      window.removeEventListener('storage', updateToken);
+      window.removeEventListener('authChanged', updateToken);
     };
-    setWidgets((prev) => [...prev, newWidget]);
+  }, []);
+
+  // Fetch widgets whenever authToken changes
+  useEffect(() => {
+    if (!authToken) {
+      setWidgets([]);
+      return;
+    }
+    const fetchWidgets = async () => {
+      const res = await fetch("/api/widgets", {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setWidgets(data.map((w: any) => ({
+          id: w.id,
+          widgetType: w.widget_type,
+          symbol: w.symbol,
+          category: w.category || "",
+          name: w.name,
+          scriptSrc: w.script_src,
+          config: typeof w.config === "string" ? JSON.parse(w.config) : w.config,
+          position: {
+            x: w.pos_x,
+            y: w.pos_y,
+            width: w.width,
+            height: w.height
+          }
+        })));
+      }
+    };
+    fetchWidgets();
+  }, [authToken]);
+
+  // Add widget
+  const addWidget = async (widget: Omit<DashboardWidgetState, 'id'>) => {
+    const token = getToken();
+    const res = await fetch("/api/widgets", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        widget_type: widget.widgetType,
+        symbol: widget.symbol,
+        name: widget.name,
+        script_src: widget.scriptSrc,
+        config: widget.config,
+        position: widget.position
+      })
+    });
+    if (res.ok) {
+      const w = await res.json();
+      setWidgets(prev => [...prev, {
+        id: w.id,
+        widgetType: w.widget_type,
+        symbol: w.symbol,
+        category: w.category || "",
+        name: w.name,
+        scriptSrc: w.script_src,
+        config: typeof w.config === "string" ? JSON.parse(w.config) : w.config,
+        position: {
+          x: w.pos_x,
+          y: w.pos_y,
+          width: w.width,
+          height: w.height
+        }
+      }]);
+    }
   };
 
-  const removeWidget = (id: string) => {
-    setWidgets((prev) => prev.filter((w) => w.id !== id));
+  // Remove widget
+  const removeWidget = async (id: string | number) => {
+    const token = getToken();
+    await fetch(`/api/widgets/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setWidgets(prev => prev.filter(w => w.id !== id));
   };
 
-  const updateWidgetPosition = (id: string, position: WidgetPosition) => {
-    setWidgets((prev) =>
-      prev.map((w) => (w.id === id ? { ...w, position } : w))
+  // Update widget position
+  const updateWidgetPosition = async (id: string | number, position: WidgetPosition) => {
+    const token = getToken();
+    await fetch(`/api/widgets/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ position })
+    });
+    setWidgets(prev =>
+      prev.map(w => w.id === id ? { ...w, position } : w)
     );
   };
 
-  const getWidgetDefinition = (id: string) => {
-    return widgets.find((w) => w.id === id);
+  // Bulk remove all widgets for the current user
+  const clearAllWidgets = async (): Promise<boolean> => {
+    const token = getToken();
+    const res = await fetch('/api/widgets', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.ok) {
+      setWidgets([]);
+      return true;
+    }
+    return false;
   };
 
+  const getWidgetDefinition = (id: string | number) => widgets.find(w => w.id === id);
+
   return (
-    <DashboardWidgetsContext.Provider 
-      value={{ 
-        widgets, 
-        addWidget, 
-        removeWidget, 
-        updateWidgetPosition,
-        getWidgetDefinition
-      }}
-    >
+    <DashboardWidgetsContext.Provider value={{
+      widgets,
+      addWidget,
+      removeWidget,
+      updateWidgetPosition,
+      getWidgetDefinition,
+      clearAllWidgets
+    }}>
       {children}
     </DashboardWidgetsContext.Provider>
   );
