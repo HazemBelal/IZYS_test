@@ -28,23 +28,6 @@ interface DashboardWidgetState {
   widgetType: string;
 }
 
-const clearUserCache = async () => {
-  try {
-    localStorage.clear();
-    sessionStorage.clear();
-    
-    if ('caches' in window) {
-      const cacheNames = await caches.keys();
-      await Promise.all(cacheNames.map(name => caches.delete(name)));
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Error clearing cache:', error);
-    return false;
-  }
-};
-
 // const getWidgetDefinitions = (symbol: string, category: string): WidgetDefinition[] => {
 //   const effectiveCategory = category === "bonds" ? "stocks" : category || "stocks";
   

@@ -78,7 +78,7 @@ const News: React.FC = () => {
   // Fetch news details for a specific article
   const fetchNewsDetails = async (url: string) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/news/detail?url=${encodeURIComponent(url)}`);
+      const response = await fetch(`/api/news/detail?url=${encodeURIComponent(url)}`);
       const data: NewsDetailsResponse = await response.json();
       setArticleContent((prev) => ({ ...prev, [url]: { content: data.content, image: data.articleImage } }));
     } catch (error) {

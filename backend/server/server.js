@@ -120,10 +120,9 @@ try {
 app.use(cors({
   origin: [
     'https://merlet.alwaysdata.net',
-    'http://merlet.alwaysdata.net',
-    'http://localhost:5173',      // <--- add this line
-    'http://127.0.0.1:5173' 
-    // Optionally, include local origins for development as well.
+    'http://merlet.alwaysdata.net'
+    // 'http://localhost:5173', // removed for production
+    // 'http://127.0.0.1:5173'
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -137,7 +136,7 @@ app.use((req, res, next) => {
     'Content-Security-Policy',
     [
       "default-src 'self' https://*.investing.com",
-      "connect-src 'self' http://31.97.154.112:5000 http://127.0.0.1:5000 https://*.investing.com",
+      "connect-src 'self' http://31.97.154.112:5000 https://*.investing.com", // removed localhost/127.0.0.1
       "media-src 'self' https://*.investing.com data:",
       "img-src 'self' https://*.investing.com data:",
       "script-src 'self' https://s3.tradingview.com",

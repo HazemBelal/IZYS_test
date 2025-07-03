@@ -25,8 +25,6 @@ import { useDashboardWidgets } from "../../../context/DashboardWidgetsContext";
 import { IconAlertCircle } from "@tabler/icons-react";
 import debounce from 'lodash.debounce';
 
-declare module 'lodash.debounce';
-
 interface LinkItem {
   label: string;
   href?: string;
@@ -172,13 +170,6 @@ const DesktopSidebar = ({
       if (tableContainerRef.current) tableContainerRef.current.scrollTop = 0;
     }, 0);
   }, [fetchSymbols]);
-
-  // Filter by search
-  const filteredSymbols = symbols.filter(
-    (sym) =>
-      sym.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sym.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   // On symbol click => open widget slider
   const handleSymbolSelect = (symbol: string) => {
