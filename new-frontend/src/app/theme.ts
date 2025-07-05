@@ -19,6 +19,15 @@ const theme = createTheme({
       primary: '#121828',
       secondary: '#65748B',
     },
+    success: {
+      main: '#3DF07E',
+    },
+    error: {
+      main: '#FF5C5C',
+    },
+    warning: {
+      main: '#FF8C43',
+    },
   },
   shape: {
     borderRadius: 8,
@@ -32,6 +41,25 @@ const theme = createTheme({
     h5: { fontWeight: 700 },
     h6: { fontWeight: 700 },
     button: { textTransform: 'none', fontWeight: 600 },
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          textTransform: 'none',
+          fontWeight: 600,
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          borderRadius: 12,
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+        },
+      },
+    },
   },
 });
 

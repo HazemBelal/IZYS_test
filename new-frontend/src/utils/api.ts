@@ -12,7 +12,7 @@ const api = axios.create({
 
 // Request interceptor to add auth token
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('jwt');
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -24,7 +24,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
+      localStorage.removeItem('jwt');
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
@@ -56,7 +56,7 @@ export const authAPI = {
 
   logout: async (): Promise<void> => {
     await api.post('/auth/logout');
-    localStorage.removeItem('token');
+    localStorage.removeItem('jwt');
     localStorage.removeItem('user');
   },
 
@@ -136,6 +136,65 @@ export const calendarAPI = {
     const response = await api.get(`/calendar/upcoming?days=${days}`);
     return response.data as EconomicEvent[];
   },
+};
+
+// API utility for authenticated requests
+export const apiRequest = async (url: string, options: RequestInit = {}) => {
+  const token = localStorage.getItem('jwt');
+  
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...options.headers,
+  };
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      // Token expired or invalid
+      localStorage.removeItem('jwt');
+      window.location.href = '/login';
+      throw new Error('Authentication required');
+    }
+    throw new Error(`API request failed: ${response.statusText}`);
+  }
+
+  return response.json();
+};
+
+// Specific API functions
+export const loginUser = async (userLogin: string, passLogin: string) => {
+  const response = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ userLogin, passLogin }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Login failed');
+  }
+
+  return response.json();
+};
+
+export const getSymbols = async (category?: string) => {
+  const url = category ? `/api/symbols?category=${category}` : '/api/symbols';
+  return apiRequest(url);
+};
+
+export const getNews = async (category: string = 'latest', page: number = 1) => {
+  return apiRequest(`/api/news?category=${category}&page=${page}`);
+};
+
+export const getCalendar = async (timeframe: string) => {
+  return apiRequest(`/api/calendar?timeframe=${timeframe}`);
 };
 
 export default api; 
