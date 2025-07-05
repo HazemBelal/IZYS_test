@@ -133,7 +133,7 @@ const DesktopSidebar = ({
       url = `/api/symbols/search?category=${category}&q=${encodeURIComponent(query)}`;
     } else {
       url = `/api/symbols/paginated?category=${category}&page=${page}&limit=50`;
-    }
+        }
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch symbols");
@@ -141,7 +141,7 @@ const DesktopSidebar = ({
       if (query) {
         setSymbols(data.symbols);
         setHasMore(false);
-      } else {
+        } else {
         setSymbols(prev => page === 1 ? data.symbols : [...prev, ...data.symbols]);
         setHasMore(data.hasMore);
       }
@@ -279,43 +279,43 @@ const DesktopSidebar = ({
                 <IconSearch className="absolute right-3 top-3 text-gray-400" />
               </div>
               {loading && (
-                <div className="space-y-2">
-                  {[...Array(10)].map((_, i) => (
-                    <div key={i} className="flex justify-between p-2 bg-gray-700 rounded animate-pulse">
-                      <div className="h-4 bg-gray-600 rounded w-1/4"></div>
-                      <div className="h-4 bg-gray-600 rounded w-1/2"></div>
-                      <div className="h-4 bg-gray-600 rounded w-1/6"></div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="space-y-2">
+                {[...Array(10)].map((_, i) => (
+                  <div key={i} className="flex justify-between p-2 bg-gray-700 rounded animate-pulse">
+                    <div className="h-4 bg-gray-600 rounded w-1/4"></div>
+                    <div className="h-4 bg-gray-600 rounded w-1/2"></div>
+                    <div className="h-4 bg-gray-600 rounded w-1/6"></div>
+                  </div>
+                ))}
+              </div>
+            )}
               {error && <div className="text-red-500 text-center">{error}</div>}
-              <div
-                ref={tableContainerRef}
-                className="overflow-y-auto flex-1 custom-scrollbar"
+                <div
+                  ref={tableContainerRef}
+                  className="overflow-y-auto flex-1 custom-scrollbar"
                 onScroll={handleScroll}
                 style={{ maxHeight: 'calc(100vh - 200px)' }}
-              >
-                <table className="w-full text-white">
-                  <thead>
-                    <tr className="bg-gray-700">
-                      <th className="px-4 py-2 text-left font-medium">Symbol</th>
-                      <th className="px-4 py-2 text-left font-medium">Description</th>
-                      <th className="px-4 py-2 text-left font-medium">Exchange</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {symbols.map((symObj) => (
-                      <tr
-                        key={`${symObj.symbol}-${symObj.exchange}`}
-                        className="hover:bg-gray-700 transition-all duration-150 cursor-pointer"
-                        onClick={() => handleSymbolSelect(symObj.symbol)}
-                      >
-                        <td className="px-4 py-2 font-normal">{symObj.symbol}</td>
-                        <td className="px-4 py-2 font-normal">{symObj.description}</td>
-                        <td className="px-4 py-2 font-normal">{symObj.exchange}</td>
+                >
+                  <table className="w-full text-white">
+                    <thead>
+                      <tr className="bg-gray-700">
+                        <th className="px-4 py-2 text-left font-medium">Symbol</th>
+                        <th className="px-4 py-2 text-left font-medium">Description</th>
+                        <th className="px-4 py-2 text-left font-medium">Exchange</th>
                       </tr>
-                    ))}
+                    </thead>
+                    <tbody>
+                    {symbols.map((symObj) => (
+                        <tr
+                          key={`${symObj.symbol}-${symObj.exchange}`}
+                          className="hover:bg-gray-700 transition-all duration-150 cursor-pointer"
+                          onClick={() => handleSymbolSelect(symObj.symbol)}
+                        >
+                          <td className="px-4 py-2 font-normal">{symObj.symbol}</td>
+                        <td className="px-4 py-2 font-normal">{symObj.description}</td>
+                          <td className="px-4 py-2 font-normal">{symObj.exchange}</td>
+                        </tr>
+                      ))}
                     {!loading && !symbols.length && (
                       <tr><td colSpan={3} className="text-center py-2">No symbols found.</td></tr>
                     )}
@@ -373,9 +373,9 @@ const DesktopSidebar = ({
                         </td>
                       </tr>
                     )}
-                  </tbody>
-                </table>
-              </div>
+                    </tbody>
+                  </table>
+                </div>
             </div>
           </motion.div>
         )}

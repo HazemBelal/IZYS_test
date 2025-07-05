@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Login.css";
+import './styles/theme.css';
 
 // Error utility function
 function getErrorMessage(error: unknown): string {
@@ -38,7 +39,7 @@ const Login = () => {
     });
     
     try {
-      // Single-origin login to your Hostinger backend
+      // Use relative /api/login so Vite proxy works in dev
       const response = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -76,48 +77,94 @@ const Login = () => {
     }
   };
   
-
+  // Responsive: add horizontal padding for mobile
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <h1>Welcome to IZYS</h1>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="username">Username</label>
+    <div style={{ minHeight: '100vh', background: 'var(--color-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <div style={{
+        background: 'var(--color-card)',
+        borderRadius: 16,
+        boxShadow: '0 4px 32px var(--color-shadow)',
+        padding: '2.5rem 2rem',
+        maxWidth: 380,
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+      }}>
+        {/* Logo/Brand */}
+        <div style={{ marginBottom: 32, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--color-accent-green)' }} />
+          <span style={{ color: 'var(--color-text-main)', fontWeight: 700, fontSize: 24, letterSpacing: 1 }}>IZYS</span>
+        </div>
+        <h2 style={{ color: 'var(--color-text-main)', fontWeight: 600, fontSize: 22, marginBottom: 18 }}>Sign in to Dashboard</h2>
+        <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+          <div style={{ marginBottom: 18 }}>
             <input
               type="text"
               id="username"
               value={username}
-              placeholder="Enter your username"
+              placeholder="Username"
               onChange={(e) => setUsername(e.target.value)}
               disabled={isLoading}
-              className={errors.username ? "error-input" : ""}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                borderRadius: 8,
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-sidebar)',
+                color: 'var(--color-text-main)',
+                fontSize: 16,
+                outline: 'none',
+                marginBottom: errors.username ? 4 : 0,
+              }}
             />
-            {errors.username && <span className="error">{errors.username}</span>}
+            {errors.username && <span style={{ color: 'var(--color-accent-red)', fontSize: 13 }}>{errors.username}</span>}
           </div>
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
+          <div style={{ marginBottom: 18 }}>
             <input
               type="password"
               id="password"
               value={password}
-              placeholder="Enter your password"
+              placeholder="Password"
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
-              className={errors.password ? "error-input" : ""}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                borderRadius: 8,
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-sidebar)',
+                color: 'var(--color-text-main)',
+                fontSize: 16,
+                outline: 'none',
+                marginBottom: errors.password ? 4 : 0,
+              }}
             />
-            {errors.password && <span className="error">{errors.password}</span>}
+            {errors.password && <span style={{ color: 'var(--color-accent-red)', fontSize: 13 }}>{errors.password}</span>}
           </div>
           <button 
             type="submit" 
             disabled={isLoading}
-            className={isLoading ? "loading" : ""}
+            style={{
+              width: '100%',
+              padding: '12px 0',
+              borderRadius: 8,
+              background: 'var(--color-accent-green)',
+              color: '#181C23',
+              fontWeight: 700,
+              fontSize: 16,
+              border: 'none',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              boxShadow: '0 2px 8px var(--color-shadow)',
+              marginTop: 8,
+              transition: 'background 0.2s',
+            }}
           >
-            {isLoading ? "Logging in..." : "Login"}
+            {isLoading ? "Signing in..." : "Sign In"}
           </button>
         </form>
         {loginMessage && (
-          <p className={`login-message ${loginMessage.toLowerCase().includes("error") ? "error" : ""}`}>
+          <p style={{ color: loginMessage.toLowerCase().includes("error") ? 'var(--color-accent-red)' : 'var(--color-accent-orange)', marginTop: 18, fontSize: 15, textAlign: 'center' }}>
             {loginMessage}
           </p>
         )}
@@ -127,3 +174,7 @@ const Login = () => {
 };
 
 export default Login;
+
+// Vite proxy note:
+// If you use /api/login as a relative path, make sure vite.config.ts has a proxy for /api to your backend.
+// This allows local dev to work with CORS automatically.

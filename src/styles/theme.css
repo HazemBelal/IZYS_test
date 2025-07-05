@@ -1,24 +1,34 @@
 /* src/styles/theme.css */
+/* New UI Theme (Blokk Coin style) */
 :root {
-    --primary-color: #4a90e2; /* Example primary color */
-    --secondary-color: #50e3c2; /* Example secondary color */
-    --background-color: #f5f7f9; /* Light background color */
-    --text-color: #333; /* Dark text color */
-    --border-color: #e1e8ed; /* Light border color */
-  }
-  
-  body {
-    background-color: var(--background-color);
-    color: var(--text-color);
+    --color-bg: #181C23;
+    --color-sidebar: #232834;
+    --color-sidebar-active: #2A2F3A;
+    --color-accent-green: #3DF07E;
+    --color-accent-orange: #FF8C43;
+    --color-accent-red: #FF5C5C;
+    --color-card: #232834;
+    --color-text-main: #FFFFFF;
+    --color-text-secondary: #A0AEC0;
+    --color-table-row-hover: #232834;
+    --color-chart-green: #3DF07E;
+    --color-chart-orange: #FF8C43;
+    --color-border: #232834;
+    --color-shadow: rgba(0,0,0,0.25);
+}
+
+body {
+    background: var(--color-bg);
+    color: var(--color-text-main);
     font-family: 'Roboto', sans-serif;
-  }
-  
-  .button {
+}
+
+.button {
     background-color: var(--primary-color);
     color: #fff;
-  }
-  
-  .button:hover {
+}
+
+.button:hover {
     background-color: var(--secondary-color);
-  }
+}
   

@@ -120,9 +120,11 @@ try {
 app.use(cors({
   origin: [
     'https://merlet.alwaysdata.net',
-    'http://merlet.alwaysdata.net'
-    // 'http://localhost:5173', // removed for production
-    // 'http://127.0.0.1:5173'
+    'http://merlet.alwaysdata.net',
+    'http://localhost:5173', // added for development
+    'http://localhost:5174', // added for development
+    'http://127.0.0.1:5173', // added for development
+    'http://127.0.0.1:5174'  // added for development
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

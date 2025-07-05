@@ -162,10 +162,10 @@ export const DashboardWidgetsProvider: React.FC<{ children: React.ReactNode }> =
 
   return (
     <DashboardWidgetsContext.Provider value={{
-      widgets,
-      addWidget,
-      removeWidget,
-      updateWidgetPosition,
+        widgets, 
+        addWidget, 
+        removeWidget, 
+        updateWidgetPosition,
       getWidgetDefinition,
       clearAllWidgets
     }}>

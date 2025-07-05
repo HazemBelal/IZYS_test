@@ -350,6 +350,7 @@ interface DashboardWidgetState {
 //   }
 // };
 
+
 const DashboardWidget: React.FC = () => {
   const { widgets, updateWidgetPosition, removeWidget, clearAllWidgets } = useDashboardWidgets();
   const { symbol } = useParams<{ symbol: string; category: string }>();

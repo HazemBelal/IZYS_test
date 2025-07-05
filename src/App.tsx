@@ -18,77 +18,77 @@ const App = () => {
       <div style={{ position: 'fixed', top: 100, left: 100, zIndex: 9999 }}>
         <span className="react-spinner"></span>
       </div>
-      <DashboardWidgetsProvider>
-        <WidgetVisibilityProvider>
-          <Routes>
-            {/* Auth Routes */}
-            <Route element={<AuthLayout />}>
-              <Route path="/login" element={<Login />} />
-              <Route path="/" element={<Navigate to="/login" />} />
-            </Route>
+    <DashboardWidgetsProvider>
+      <WidgetVisibilityProvider>
+        <Routes>
+          {/* Auth Routes */}
+          <Route element={<AuthLayout />}>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<Navigate to="/login" />} />
+          </Route>
 
-            {/* Main App Routes */}
-            <Route element={<DashboardLayout />}>
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute>
-                    <DashboardWidget />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/calendar"
-                element={
-                  <ProtectedRoute>
-                    <Calendar />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/news"
-                element={
-                  <ProtectedRoute>
-                    <News />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/bonds"
-                element={
-                  <ProtectedRoute>
-                    <BondsWidget />
-                  </ProtectedRoute>
-                }
-              />
+          {/* Main App Routes */}
+          <Route element={<DashboardLayout />}>
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <DashboardWidget />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/calendar"
+              element={
+                <ProtectedRoute>
+                  <Calendar />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/news"
+              element={
+                <ProtectedRoute>
+                  <News />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bonds"
+              element={
+                <ProtectedRoute>
+                  <BondsWidget />
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Settings Route now has a child */}
-              <Route
-                path="/settings"
-                element={
-                  <ProtectedRoute>
-                    {/* Replace this with your actual Settings component */}
-                    <div className="p-4 text-white">
-                      <h1 className="text-2xl">Settings</h1>
-                      <p>Settings page coming soon.</p>
-                    </div>
-                  </ProtectedRoute>
-                }
-              />
+            {/* Settings Route now has a child */}
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  {/* Replace this with your actual Settings component */}
+                  <div className="p-4 text-white">
+                    <h1 className="text-2xl">Settings</h1>
+                    <p>Settings page coming soon.</p>
+                  </div>
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Backward‐compatible symbol route */}
-              <Route
-                path="/dashboard/:category/:symbol"
-                element={
-                  <ProtectedRoute>
-                    <DashboardWidget />
-                  </ProtectedRoute>
-                }
-              />
-            </Route>
-          </Routes>
-        </WidgetVisibilityProvider>
-      </DashboardWidgetsProvider>
+            {/* Backward‐compatible symbol route */}
+            <Route
+              path="/dashboard/:category/:symbol"
+              element={
+                <ProtectedRoute>
+                  <DashboardWidget />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
+        </Routes>
+      </WidgetVisibilityProvider>
+    </DashboardWidgetsProvider>
     </>
   );
 };

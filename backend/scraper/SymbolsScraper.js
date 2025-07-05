@@ -102,18 +102,18 @@ export const scrapeTradingViewSymbols = async (category) => {
           const [exchange, symbol] = r.s.split(':');
           let rawDesc = r.d[0] || '';
           const description = rawDesc.split(' on ')[0].trim();
-          const currency = category === 'forex' ? 'USD'
-                            : category === 'crypto' ? 'USDT'
-                            : 'USD';
+        const currency = category === 'forex' ? 'USD'
+                       : category === 'crypto' ? 'USDT'
+                       : 'USD';
           const dbCategory = category;
-          return [
+        return [
             `${exchange}:${symbol}`.replace(/\s+/g,''),
             symbol,
             r.d[1] || symbol,
             description,
             category === 'crypto' ? 'cryptocurrency'
-              : category === 'forex' ? 'currency'
-              : 'stock',
+            : category === 'forex' ? 'currency'
+            : 'stock',
             dbCategory,
             exchange,
             currency,
@@ -121,8 +121,8 @@ export const scrapeTradingViewSymbols = async (category) => {
             'General',
             'General',
             idx
-          ];
-        });
+        ];
+      });
     }
 
     if (values.length) {
