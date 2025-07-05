@@ -355,7 +355,20 @@ const WidgetGallery: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const listRef = useRef<HTMLUListElement>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { addWidget } = useDashboard();
+
+  // Utility function to deduplicate symbols by ID
+  const deduplicateSymbols = (symbolsArray: any[]): any[] => {
+    const seen = new Set();
+    return symbolsArray.filter(sym => {
+      if (seen.has(sym.id)) {
+        return false;
+      }
+      seen.add(sym.id);
+      return true;
+    });
+  };
 
   // Reset on category/search change
   useEffect(() => {
@@ -375,13 +388,13 @@ const WidgetGallery: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
         if (debouncedSearch.length > 1) {
           const results = await symbolsApi.searchSymbols(category, debouncedSearch);
           if (!ignore) {
-            setSymbols(results);
+            setSymbols(deduplicateSymbols(results));
             setHasMore(false);
           }
         } else {
           const { symbols: newSymbols, hasMore } = await symbolsApi.getPaginatedSymbols(category, 1);
           if (!ignore) {
-            setSymbols(newSymbols);
+            setSymbols(deduplicateSymbols(newSymbols));
             setHasMore(hasMore);
           }
         }
@@ -393,25 +406,57 @@ const WidgetGallery: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
     return () => { ignore = true; };
   }, [category, debouncedSearch]);
 
-  // Infinite scroll handler
+  // Infinite scroll handler with debouncing
   const handleScroll = useCallback(() => {
     if (!listRef.current || loadingMore || !hasMore || search.length > 1) return;
+    
     const { scrollTop, scrollHeight, clientHeight } = listRef.current;
     if (scrollHeight - scrollTop - clientHeight < 40) {
-      setLoadingMore(true);
-      symbolsApi.getPaginatedSymbols(category, page + 1).then(({ symbols: more, hasMore: moreHasMore }) => {
-        setSymbols((prev) => [...prev, ...more]);
-        setPage((p) => p + 1);
-        setHasMore(moreHasMore);
-      }).finally(() => setLoadingMore(false));
+      // Clear any existing timeout
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      
+      // Debounce the API call
+      scrollTimeoutRef.current = setTimeout(() => {
+        setLoadingMore(true);
+        
+        symbolsApi.getPaginatedSymbols(category, page + 1)
+          .then(({ symbols: more, hasMore: moreHasMore }: { symbols: any[], hasMore: boolean }) => {
+            if (more && more.length > 0) {
+              setSymbols((prev) => {
+                // Combine existing and new symbols, then deduplicate
+                const combined = [...prev, ...more];
+                return deduplicateSymbols(combined);
+              });
+              setPage((p) => p + 1);
+              setHasMore(moreHasMore);
+            } else {
+              setHasMore(false);
+            }
+          })
+          .catch((error: any) => {
+            console.error('Error loading more symbols:', error);
+            setHasMore(false);
+          })
+          .finally(() => {
+            setLoadingMore(false);
+          });
+      }, 150); // 150ms debounce
     }
-  }, [category, page, hasMore, loadingMore, search.length]);
+  }, [category, page, hasMore, loadingMore, search.length, deduplicateSymbols]);
 
   useEffect(() => {
     const ref = listRef.current;
     if (!ref) return;
     ref.addEventListener('scroll', handleScroll);
-    return () => { ref.removeEventListener('scroll', handleScroll); };
+    return () => { 
+      ref.removeEventListener('scroll', handleScroll);
+      // Cleanup timeout on unmount
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
   }, [handleScroll]);
 
   const widgets = selectedSymbol ? getWidgetDefinitions(selectedSymbol.symbol, category) : [];
