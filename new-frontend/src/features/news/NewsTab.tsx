@@ -102,14 +102,14 @@ const NewsTab: React.FC = () => {
     }
   };
 
-  const handleCategoryChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleCategoryChange = (_: React.SyntheticEvent, newValue: number) => {
     setSelectedCategory(newValue);
     setCurrentPage(1);
     const category = newsCategories[newValue].value;
     fetchNews(category, 1);
   };
 
-  const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
+  const handlePageChange = (_: React.ChangeEvent<unknown>, page: number) => {
     setCurrentPage(page);
     const category = newsCategories[selectedCategory].value;
     fetchNews(category, page);
@@ -183,7 +183,7 @@ const NewsTab: React.FC = () => {
             },
           }}
         >
-          {newsCategories.map((category, index) => (
+          {newsCategories.map((category) => (
             <Tab key={category.value} label={category.label} />
           ))}
         </Tabs>

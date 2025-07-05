@@ -28,7 +28,6 @@ import {
 } from '../scraper/newsScraper.js';
 
 import { scrapeForexFactoryRange } from '../scraper/calendarScraper.js';
-import symbolScraperModule from '../scraper/SymbolsScraper.js';
 
 
 // 1) Use local Redis on your VPS (or override via ENV) 
@@ -120,13 +119,8 @@ try {
 app.use(cors({
   origin: [
     'https://merlet.alwaysdata.net',
-    'http://merlet.alwaysdata.net',
-    'http://31.97.154.112:5173', // for dev
-    'http://31.97.154.112:5174', // for dev
-    'http://localhost:5173', // keep for local dev if needed
-    'http://localhost:5174', // keep for local dev if needed
-    'http://127.0.0.1:5173', // keep for local dev if needed
-    'http://127.0.0.1:5174'  // keep for local dev if needed
+    'http://merlet.alwaysdata.net'
+    // Optionally, include local origins for development as well.
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -140,7 +134,7 @@ app.use((req, res, next) => {
     'Content-Security-Policy',
     [
       "default-src 'self' https://*.investing.com",
-      "connect-src 'self' http://31.97.154.112:5000 https://*.investing.com", // removed localhost/127.0.0.1
+      "connect-src 'self' http://31.97.154.112:5000 http://127.0.0.1:5000 https://*.investing.com",
       "media-src 'self' https://*.investing.com data:",
       "img-src 'self' https://*.investing.com data:",
       "script-src 'self' https://s3.tradingview.com",
@@ -187,26 +181,6 @@ const symbolService = {
           username VARCHAR(255) NOT NULL UNIQUE,
           password_hash VARCHAR(255) NOT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      
-      // Create dashboard_widgets table if not exists
-      await dbPool.query(`
-        CREATE TABLE IF NOT EXISTS dashboard_widgets (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          user_id INT NOT NULL,
-          widget_type VARCHAR(50) NOT NULL,
-          symbol VARCHAR(50) NOT NULL,
-          name VARCHAR(100),
-          script_src TEXT,
-          config JSON,
-          pos_x INT,
-          pos_y INT,
-          width INT,
-          height INT,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users(id)
         )
       `);
       
@@ -421,20 +395,6 @@ app.get('/api/symbols/paginated', async (req, res) => {
   }
 });
 
-app.get('/api/symbols/search', async (req, res) => {
-  const { category, q } = req.query;
-  if (!category || !q) return res.status(400).json({ error: 'Category and query are required' });
-  try {
-    const [symbols] = await dbPool.query(
-      'SELECT * FROM financial_symbols WHERE category = ? AND (symbol LIKE ? OR description LIKE ?) LIMIT 100',
-      [category, `%${q}%`, `%${q}%`]
-    );
-    res.json({ symbols });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to search symbols', details: err.message });
-  }
-});
-
 app.get('/api/symbols/stream', async (req, res) => {
   try {
     const { category } = req.query;
@@ -579,18 +539,6 @@ cron.schedule('*/30 * * * *', async () => {
   }
   console.log(`Scheduled news refresh completed at ${new Date()}`);
 });
-
-// Weekly cron job to refresh symbols every Sunday at midnight
-cron.schedule('0 0 * * 0', async () => {
-  console.log('Starting weekly symbol refresh...');
-  try {
-    await symbolService.refreshSymbols();
-    console.log('Weekly symbol refresh complete.');
-  } catch (err) {
-    console.error('Weekly symbol refresh failed:', err);
-  }
-});
-
 function getLocalIp() {
   const nets = os.networkInterfaces();
   for (const name of Object.keys(nets)) {
@@ -609,35 +557,10 @@ function getLocalIp() {
 // ==========================================================
 // Start Server and Graceful Shutdown
 // ==========================================================
-const CATEGORY_MAP = symbolScraperModule.CATEGORY_MAP || {
-  forex:       'forex',
-  crypto:      'crypto',
-  stocks:      'stock',
-  actions:     'stock',
-  bonds:       'bonds',
-  commodities: 'futures',
-  indices:     'index'
-};
-
-async function ensureSymbolsInDb() {
-  // For each category, check if there are any symbols in the DB
-  for (const category of Object.keys(CATEGORY_MAP)) {
-    const [rows] = await dbPool.query('SELECT COUNT(*) as count FROM financial_symbols WHERE category = ?', [category]);
-    if (rows[0].count === 0) {
-      console.log(`No symbols found in DB for category '${category}', scraping and populating...`);
-      await symbolScraperModule.scrapeTradingViewSymbols(category);
-      console.log(`Symbols for '${category}' populated.`);
-    } else {
-      console.log(`Symbols already present in DB for category '${category}', skipping initial scrape.`);
-    }
-  }
-}
-
 async function startServer() {
   try {
     // Initialize required services before starting the server
     await symbolService.init();
-    await ensureSymbolsInDb();
 
     // Use HOST from environment with a default fallback
     const HOST = process.env.HOST || '0.0.0.0';
@@ -648,13 +571,18 @@ async function startServer() {
 - Your local IP: http://${getLocalIp()}:${PORT}`);
     });
 
+    // Kick off the initial background load for symbols
+    symbolService.refreshSymbols()
+      .then(symbols => console.log(`✅ Loaded ${symbols.length} symbols`))
+      .catch(err => console.error('⚠️ Initial symbol load failed:', err));
+
     return server;
   } catch (err) {
     console.error('❌ Server initialization failed:', err);
     process.exit(1);
   }
 }
-app.use(express.static(path.join(__dirname, '../../new-frontend/dist'), { 
+app.use(express.static(path.join(__dirname, '../../dist'), { 
   setHeaders: (res, filePath) => { 
     if (filePath.endsWith('.js')) { 
       res.setHeader('Content-Type', 'application/javascript'); 
@@ -664,7 +592,7 @@ app.use(express.static(path.join(__dirname, '../../new-frontend/dist'), {
  
 // client-side routing catch-all (ignore /api/*) 
 app.get(/^\/(?!api\/).*/, (req, res) => { 
-  res.sendFile(path.join(__dirname, '../../new-frontend/dist/index.html')); 
+  res.sendFile(path.join(__dirname, '../../dist/index.html')); 
 });
 startServer();
 
@@ -680,110 +608,5 @@ process.on('SIGTERM', async () => {
   } catch (err) {
     console.error('❌ Error during shutdown:', err);
     process.exit(1);
-  }
-});
-
-// --------------------------
-// JWT Middleware for widgets endpoints
-// --------------------------
-function requireAuth(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  if (!authHeader) return res.status(401).json({ error: 'No token provided' });
-  const token = authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Malformed token' });
-  jwt.verify(token, config.jwt.secret, (err, decoded) => {
-    if (err) return res.status(401).json({ error: 'Invalid token' });
-    req.userId = decoded.userId;
-    next();
-  });
-}
-
-// ==========================================================
-// Widgets Endpoints (CRUD)
-// ==========================================================
-app.get('/api/widgets', requireAuth, async (req, res) => {
-  try {
-    const [widgets] = await dbPool.query(
-      'SELECT * FROM dashboard_widgets WHERE user_id = ?',
-      [req.userId]
-    );
-    res.json(widgets);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch widgets', details: err.message });
-  }
-});
-
-app.post('/api/widgets', requireAuth, async (req, res) => {
-  try {
-    const { widget_type, symbol, name, script_src, config, position } = req.body;
-    if (!widget_type || !symbol || !position) {
-      return res.status(400).json({ error: 'widget_type, symbol, and position are required' });
-    }
-    const { x, y, width, height } = position;
-    const [result] = await dbPool.query(
-      'INSERT INTO dashboard_widgets (user_id, widget_type, symbol, name, script_src, config, pos_x, pos_y, width, height) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [req.userId, widget_type, symbol, name, script_src, JSON.stringify(config), x, y, width, height]
-    );
-    const [widgetRows] = await dbPool.query('SELECT * FROM dashboard_widgets WHERE id = ?', [result.insertId]);
-    res.status(201).json(widgetRows[0]);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to add widget', details: err.message });
-  }
-});
-
-app.put('/api/widgets/:id', requireAuth, async (req, res) => {
-  try {
-    const widgetId = req.params.id;
-    const { position, config, name } = req.body;
-    // Only allow update if widget belongs to user
-    const [widgets] = await dbPool.query('SELECT * FROM dashboard_widgets WHERE id = ? AND user_id = ?', [widgetId, req.userId]);
-    if (!widgets.length) return res.status(404).json({ error: 'Widget not found' });
-    const updates = [];
-    const params = [];
-    if (position) {
-      updates.push('pos_x = ?', 'pos_y = ?', 'width = ?', 'height = ?');
-      params.push(position.x, position.y, position.width, position.height);
-    }
-    if (config) {
-      updates.push('config = ?');
-      params.push(JSON.stringify(config));
-    }
-    if (name) {
-      updates.push('name = ?');
-      params.push(name);
-    }
-    if (!updates.length) return res.status(400).json({ error: 'No fields to update' });
-    params.push(widgetId, req.userId);
-    await dbPool.query(
-      `UPDATE dashboard_widgets SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`,
-      params
-    );
-    const [updatedRows] = await dbPool.query('SELECT * FROM dashboard_widgets WHERE id = ?', [widgetId]);
-    res.json(updatedRows[0]);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to update widget', details: err.message });
-  }
-});
-
-app.delete('/api/widgets/:id', requireAuth, async (req, res) => {
-  try {
-    const widgetId = req.params.id;
-    // Only allow delete if widget belongs to user
-    const [widgets] = await dbPool.query('SELECT * FROM dashboard_widgets WHERE id = ? AND user_id = ?', [widgetId, req.userId]);
-    if (!widgets.length) return res.status(404).json({ error: 'Widget not found' });
-    await dbPool.query('DELETE FROM dashboard_widgets WHERE id = ? AND user_id = ?', [widgetId, req.userId]);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete widget', details: err.message });
-  }
-});
-
-// Bulk delete all widgets for the current user
-app.delete('/api/widgets', requireAuth, async (req, res) => {
-  try {
-    await dbPool.query('DELETE FROM dashboard_widgets WHERE user_id = ?', [req.userId]);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to clear dashboard', details: err.message });
   }
 });

@@ -12,7 +12,7 @@ const ResponsiveGridLayout = WidthProvider(Responsive);
 const DashboardGrid: React.FC = () => {
   const { widgets, layout, updateLayout, removeWidget, reloadWidgets } = useDashboard();
 
-  const handleLayoutChange = useCallback(async (currentLayout: any, allLayouts: any) => {
+  const handleLayoutChange = useCallback(async (currentLayout: any) => {
     await updateLayout(currentLayout);
   }, [updateLayout]);
 
