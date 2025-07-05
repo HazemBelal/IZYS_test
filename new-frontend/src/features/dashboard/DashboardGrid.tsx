@@ -10,7 +10,7 @@ import './DashboardGrid.css';
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
 const DashboardGrid: React.FC = () => {
-  const { widgets, layout, updateLayout, removeWidget } = useDashboard();
+  const { widgets, layout, updateLayout, removeWidget, reloadWidgets } = useDashboard();
 
   const handleLayoutChange = useCallback(async (currentLayout: any, allLayouts: any) => {
     await updateLayout(currentLayout);
@@ -19,11 +19,12 @@ const DashboardGrid: React.FC = () => {
   const handleRemoveWidget = useCallback(async (id: string | number) => {
     try {
       await removeWidget(id);
-    } catch (error) {
-      console.error('Error removing widget:', error);
-      // You could add a toast notification here
+      await reloadWidgets(); // ensure UI matches DB
+    } catch (err) {
+      console.error('Could not delete widget:', err);
+      // Optionally show a toast/snackbar here
     }
-  }, [removeWidget]);
+  }, [removeWidget, reloadWidgets]);
 
   // Convert widgets to grid layout format
   const gridLayout = layout.map(item => ({
@@ -61,6 +62,7 @@ const DashboardGrid: React.FC = () => {
         preventCollision={false}
         autoSize={true}
         style={{ minHeight: `${dynamicHeight}px` }}
+        draggableCancel=".MuiIconButton-root"
       >
         {widgets.map(widget => (
           <Box

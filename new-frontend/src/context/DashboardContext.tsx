@@ -47,14 +47,9 @@ interface DashboardContextType {
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
 
-const LAYOUT_STORAGE_KEY = 'dashboard_layout';
-
 export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [widgets, setWidgets] = useState<DashboardWidget[]>([]);
-  const [layout, setLayout] = useState<GridLayoutItem[]>(() => {
-    const saved = localStorage.getItem(LAYOUT_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [layout, setLayout] = useState<GridLayoutItem[]>([]);
 
   const mapWidgetFromBackend = (w: any): DashboardWidget => ({
     id: w.id,
@@ -86,14 +81,14 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return { x: 0, y: maxY, w: 4, h: 3 };
   };
 
-  // Sync layout with widgets
+  // Sync layout with widgets (only for new widgets that don't have layout entries)
   useEffect(() => {
     setLayout(prevLayout => {
       // Remove layouts for deleted widgets
       const widgetIds = widgets.map(w => String(w.id));
       let newLayout = prevLayout.filter(l => widgetIds.includes(l.i));
       
-      // Add layouts for new widgets
+      // Add layouts for new widgets that don't have layout entries yet
       widgets.forEach(w => {
         if (!newLayout.find(l => l.i === String(w.id))) {
           newLayout.push({
@@ -113,18 +108,28 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   }, [widgets]);
 
-  // Persist layout to localStorage
-  useEffect(() => {
-    localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layout));
-  }, [layout]);
-
   const reloadWidgets = useCallback(async () => {
     try {
       const data = await widgetsApi.getWidgets();
-      setWidgets(Array.isArray(data) ? data.map(mapWidgetFromBackend) : []);
+      const mapped = Array.isArray(data) ? data.map(mapWidgetFromBackend) : [];
+      setWidgets(mapped);
+      
+      // Build layout from the DB-saved positions
+      setLayout(mapped.map(w => ({
+        i: String(w.id),
+        x: w.position.x,
+        y: w.position.y,
+        w: w.position.width,
+        h: w.position.height,
+        minW: 2,
+        minH: 2,
+        maxW: 12,
+        maxH: 12,
+      })));
     } catch (error) {
       console.error('Error loading widgets:', error);
       setWidgets([]);
+      setLayout([]);
     }
   }, []);
 
@@ -191,47 +196,39 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const updateLayout = async (newLayout: GridLayoutItem[]) => {
+    // 1) Fire off an update for each widget whose coords changed
+    await Promise.all(
+      newLayout.map(l => {
+        const w = widgets.find(w => String(w.id) === l.i);
+        if (!w) return Promise.resolve();
+        
+        // only send if something moved/resized
+        if (
+          w.position.x !== l.x ||
+          w.position.y !== l.y ||
+          w.position.width !== l.w ||
+          w.position.height !== l.h
+        ) {
+          return widgetsApi.updateWidget(w.id, {
+            position: { x: l.x, y: l.y, width: l.w, height: l.h }
+          });
+        }
+        return Promise.resolve();
+      })
+    );
+
+    // 2) Update React state so the grid immediately reflects it
     setLayout(newLayout);
-    
-    // Update widget positions based on layout and save to database
-    const updatedWidgets = widgets.map((w) => {
-      const l = newLayout.find((l) => l.i === String(w.id));
-      return l
-        ? {
-            ...w,
-            position: {
-              x: l.x,
-              y: l.y,
-              width: l.w,
-              height: l.h,
-            },
-          }
-        : w;
-    });
-    
-    setWidgets(updatedWidgets);
-    
-    // Save position updates to database
-    const positionUpdates = updatedWidgets.map(widget => {
-      const l = newLayout.find((l) => l.i === String(widget.id));
-      if (l) {
-        return widgetsApi.updateWidget(widget.id, {
-          position: {
-            x: l.x,
-            y: l.y,
-            width: l.w,
-            height: l.h,
-          }
-        });
-      }
-      return Promise.resolve();
-    });
-    
-    try {
-      await Promise.all(positionUpdates);
-    } catch (error) {
-      console.error('Error saving widget positions:', error);
-    }
+    setWidgets(prev =>
+      prev.map(w => {
+        const l = newLayout.find(item => item.i === String(w.id));
+        if (!l) return w;
+        return {
+          ...w,
+          position: { x: l.x, y: l.y, width: l.w, height: l.h }
+        };
+      })
+    );
   };
 
   const updateWidgetPosition = async (id: string | number, position: WidgetPosition) => {
