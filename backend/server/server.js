@@ -140,13 +140,13 @@ app.use((req, res, next) => {
     'Content-Security-Policy',
     [
       "default-src 'self' https://*.investing.com",
-      "connect-src 'self' http://31.97.154.112:5000 https://*.investing.com", // removed localhost/127.0.0.1
+      "connect-src 'self' http://31.97.154.112:5000 https://*.investing.com",
       "media-src 'self' https://*.investing.com data:",
       "img-src 'self' https://*.investing.com data:",
       "script-src 'self' https://s3.tradingview.com",
       "script-src-elem 'self' https://s3.tradingview.com",
-      "style-src 'self' https://fonts.googleapis.com",
-      "style-src-elem 'self' https://fonts.googleapis.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "frame-src 'self' https://*.tradingview.com https://tradingview-widget.com https://*.tradingview-widget.com"
     ].join('; ')
@@ -727,7 +727,8 @@ app.post('/api/widgets', requireAuth, async (req, res) => {
     const [widgetRows] = await dbPool.query('SELECT * FROM dashboard_widgets WHERE id = ?', [result.insertId]);
     res.status(201).json(widgetRows[0]);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to add widget', details: err.message });
+    console.error('Failed to add widget:', err);
+    res.status(500).json({ error: 'Failed to add widget', details: err.message, stack: err.stack });
   }
 });
 
