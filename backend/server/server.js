@@ -234,7 +234,7 @@ const symbolService = {
       const symbols = await symbolScraper.scrapeAll(); 
  
       // Bust Redis caches so the front-end sees the new data. 
-      for (const cat of ["forex","crypto","stocks","bonds","index","futures"]) { 
+      for (const cat of ["forex","crypto","stocks","bonds","futures","etfs"]) { 
         await redisClient.del(`symbols:${cat}`); 
       } 
  
@@ -585,6 +585,8 @@ cron.schedule('0 0 * * 0', async () => {
   console.log('Starting weekly symbol refresh...');
   try {
     await symbolService.refreshSymbols();
+    // Also refresh ETFs from FMP API
+    await refreshEtfsFromFmp();
     console.log('Weekly symbol refresh complete.');
   } catch (err) {
     console.error('Weekly symbol refresh failed:', err);
@@ -613,22 +615,35 @@ const CATEGORY_MAP = symbolScraperModule.CATEGORY_MAP || {
   forex:       'forex',
   crypto:      'crypto',
   stocks:      'stock',
-  actions:     'stock',
+  futures:     'futures',
   bonds:       'bonds',
-  commodities: 'futures',
-  indices:     'index'
+  etfs:        'etfs',
+  actions:     'stock',
+  commodities: 'futures'
 };
 
 async function ensureSymbolsInDb() {
   // For each category, check if there are any symbols in the DB
   for (const category of Object.keys(CATEGORY_MAP)) {
-    const [rows] = await dbPool.query('SELECT COUNT(*) as count FROM financial_symbols WHERE category = ?', [category]);
-    if (rows[0].count === 0) {
-      console.log(`No symbols found in DB for category '${category}', scraping and populating...`);
-      await symbolScraperModule.scrapeTradingViewSymbols(category);
-      console.log(`Symbols for '${category}' populated.`);
+    if (category === 'etfs') {
+      // Special handling for ETFs - check if we have ETFs in DB
+      const [rows] = await dbPool.query('SELECT COUNT(*) as count FROM financial_symbols WHERE category = ?', [category]);
+      if (rows[0].count === 0) {
+        console.log(`No ETFs found in DB, fetching from Financial Modeling Prep API...`);
+        await refreshEtfsFromFmp();
+        console.log(`ETFs populated from FMP API.`);
+      } else {
+        console.log(`ETFs already present in DB (${rows[0].count} ETFs), skipping initial fetch.`);
+      }
     } else {
-      console.log(`Symbols already present in DB for category '${category}', skipping initial scrape.`);
+      const [rows] = await dbPool.query('SELECT COUNT(*) as count FROM financial_symbols WHERE category = ?', [category]);
+      if (rows[0].count === 0) {
+        console.log(`No symbols found in DB for category '${category}', scraping and populating...`);
+        await symbolScraperModule.scrapeTradingViewSymbols(category);
+        console.log(`Symbols for '${category}' populated.`);
+      } else {
+        console.log(`Symbols already present in DB for category '${category}', skipping initial scrape.`);
+      }
     }
   }
 }
@@ -786,5 +801,194 @@ app.delete('/api/widgets', requireAuth, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to clear dashboard', details: err.message });
+  }
+});
+
+
+
+// ==========================================================
+// Database-based ETF, Futures, Bonds, and Options Endpoints
+// ==========================================================
+
+// ETF endpoint - uses database like other categories
+app.get('/api/etfs', async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Get ETFs from database with pagination
+    const [etfs] = await dbPool.query(
+      'SELECT * FROM financial_symbols WHERE category = ? ORDER BY symbol ASC LIMIT ? OFFSET ?',
+      ['etfs', parseInt(limit), offset]
+    );
+    
+    // Get total count for pagination
+    const [countResult] = await dbPool.query(
+      'SELECT COUNT(*) as total FROM financial_symbols WHERE category = ?',
+      ['etfs']
+    );
+    
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / parseInt(limit));
+    
+    res.json({
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages,
+      etfs
+    });
+  } catch (err) {
+    console.error('❌ ETF endpoint error:', err);
+    res.status(500).json({ error: 'Failed to fetch ETFs', details: err.message });
+  }
+});
+
+// Futures endpoint - uses database like other categories
+app.get('/api/futures', async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Get futures from database with pagination
+    const [futures] = await dbPool.query(
+      'SELECT * FROM financial_symbols WHERE category = ? ORDER BY order_index ASC LIMIT ? OFFSET ?',
+      ['futures', parseInt(limit), offset]
+    );
+    
+    // Get total count for pagination
+    const [countResult] = await dbPool.query(
+      'SELECT COUNT(*) as total FROM financial_symbols WHERE category = ?',
+      ['futures']
+    );
+    
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / parseInt(limit));
+    
+    res.json({
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages,
+      futures
+    });
+  } catch (err) {
+    console.error('❌ Futures endpoint error:', err);
+    res.status(500).json({ error: 'Failed to fetch futures', details: err.message });
+  }
+});
+
+// Bonds endpoint - uses database like other categories
+app.get('/api/bonds', async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Get bonds from database with pagination
+    const [bonds] = await dbPool.query(
+      'SELECT * FROM financial_symbols WHERE category = ? ORDER BY order_index ASC LIMIT ? OFFSET ?',
+      ['bonds', parseInt(limit), offset]
+    );
+    
+    // Get total count for pagination
+    const [countResult] = await dbPool.query(
+      'SELECT COUNT(*) as total FROM financial_symbols WHERE category = ?',
+      ['bonds']
+    );
+    
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / parseInt(limit));
+    
+    res.json({
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages,
+      bonds
+    });
+  } catch (err) {
+    console.error('❌ Bonds endpoint error:', err);
+    res.status(500).json({ error: 'Failed to fetch bonds', details: err.message });
+  }
+});
+
+
+
+// ==========================================================
+// ETF Refresh from Financial Modeling Prep API
+// ==========================================================
+
+async function refreshEtfsFromFmp() {
+  const url = 'https://financialmodelingprep.com/api/v3/etf/list?apikey=rfgUWPuVS8VZkhV1sRCyRFxqZe7q177N';
+  try {
+    console.log('🔄 Fetching ETFs from Financial Modeling Prep API...');
+    const response = await fetch(url);
+    const data = await response.json();
+
+    // Only keep US ETFs
+    const usEtfs = data.filter(etf =>
+      ['AMEX', 'NASDAQ', 'NYSE'].includes(etf.exchangeShortName)
+    );
+
+    console.log(`📊 Found ${usEtfs.length} US ETFs from FMP API`);
+
+    // Clear existing ETFs from database
+    await dbPool.query('DELETE FROM financial_symbols WHERE category = ?', ['etfs']);
+    console.log('🗑️ Cleared existing ETFs from database');
+
+    // Insert new ETFs into the database
+    let insertedCount = 0;
+    for (const etf of usEtfs) {
+      try {
+        await dbPool.query(
+          `INSERT INTO financial_symbols (id, symbol, name, description, type, category, exchange, currency, country, sector, industry)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            `etf_${etf.symbol}`,
+            etf.symbol,
+            etf.name,
+            etf.name,
+            'etf',
+            'etfs',
+            etf.exchangeShortName,
+            'USD', // Most US ETFs are in USD
+            'US',
+            'ETF',
+            etf.exchangeShortName
+          ]
+        );
+        insertedCount++;
+      } catch (err) {
+        console.error(`❌ Error inserting ETF ${etf.symbol}:`, err.message);
+      }
+    }
+
+    console.log(`✅ Successfully inserted ${insertedCount} ETFs into database`);
+    
+    // Clear Redis cache for ETFs
+    await redisClient.del('symbols:etfs');
+    console.log('🧹 Cleared ETF cache from Redis');
+
+    return insertedCount;
+  } catch (err) {
+    console.error('❌ Error refreshing ETFs from FMP:', err);
+    throw err;
+  }
+}
+
+// Admin endpoint to refresh ETFs from FMP API
+app.post('/api/etfs/refresh', async (req, res) => {
+  try {
+    console.log('🔄 Manual ETF refresh requested...');
+    const count = await refreshEtfsFromFmp();
+    res.json({ 
+      success: true, 
+      count, 
+      message: `Successfully refreshed ${count} ETFs from Financial Modeling Prep API`,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('❌ ETF refresh endpoint error:', err);
+    res.status(500).json({ error: 'Failed to refresh ETFs', details: err.message });
   }
 });

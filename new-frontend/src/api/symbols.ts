@@ -104,4 +104,41 @@ export const getSymbolsStream = (category: string, onData: (symbols: Symbol[]) =
   return () => {
     eventSource.close();
   };
-}; 
+};
+
+// Database response interface for all categories
+export interface DatabaseResponse {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  [key: string]: any; // For etfs, futures, bonds, options arrays
+}
+
+// Fetch paginated data from database for any category
+export const getPaginatedData = async (category: string, page: number = 1, limit: number = 20): Promise<DatabaseResponse> => {
+  try {
+    const response = await api.get<DatabaseResponse>(`/${category}?page=${page}&limit=${limit}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching ${category}:`, error);
+    return { total: 0, page: 1, limit: 20, totalPages: 0, [category]: [] };
+  }
+};
+
+// Legacy ETF functions for backward compatibility
+export const getEtfsPaginated = async (page: number = 1, limit: number = 20): Promise<DatabaseResponse> => {
+  return getPaginatedData('etfs', page, limit);
+};
+
+export const getAllEtfs = async (): Promise<any[]> => {
+  try {
+    const response = await getEtfsPaginated(1, 1000);
+    return response.etfs || [];
+  } catch (error) {
+    console.error('Error fetching ETFs:', error);
+    return [];
+  }
+};
+
+ 

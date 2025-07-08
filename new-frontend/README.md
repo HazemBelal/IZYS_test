@@ -90,3 +90,58 @@ The frontend communicates with your existing backend API. Make sure your backend
 2. Use TypeScript for all new components
 3. Add proper error handling
 4. Test your changes thoroughly
+
+## Widget Categories
+
+The dashboard supports the following trading categories, each with specialized widgets:
+
+### Available Categories
+
+1. **Forex** - Foreign exchange currency pairs
+   - Symbol Info, Advanced Chart, Company Profile, Technical Analysis, Top Stories, Economic Calendar, Forex Cross Rates
+
+2. **Crypto** - Cryptocurrencies
+   - Symbol Info, Advanced Chart, Company Profile, Technical Analysis, Top Stories, Coins Heatmap, Crypto Market
+
+3. **Stocks** - US stock market
+   - Symbol Info, Advanced Chart, Company Profile, Fundamental Data, Technical Analysis, Top Stories
+
+4. **Futures** - Futures contracts
+   - Symbol Info, Advanced Chart, Technical Analysis, Top Stories, Economic Calendar
+
+5. **Bonds** - Government and corporate bonds
+   - Symbol Info, Advanced Chart, Technical Analysis, Economic Calendar
+
+6. **ETFs** - Exchange-traded funds
+   - Symbol Info, Advanced Chart, ETF Profile, Technical Analysis, Top Stories, ETF Heatmap
+
+7. **Options** - Options contracts
+   - Symbol Info, Advanced Chart, Technical Analysis, Top Stories
+
+8. **Indices** - Market indices
+   - Symbol Info, Advanced Chart, Technical Analysis, Top Stories, Economic Calendar
+
+### TradingView API Integration
+
+All categories are powered by the TradingView Screener API, which provides real-time market data and technical analysis. The categories map to specific TradingView markets:
+
+- `forex` → TradingView forex market
+- `crypto` → TradingView crypto market  
+- `stocks` → TradingView america market (US stocks)
+- `futures` → TradingView futures market
+- `bonds` → TradingView bonds market
+- `etfs` → Filtered from TradingView america market
+- `options` → TradingView options market
+- `indices` → TradingView index market
+
+## Widget Types
+
+Each category supports different widget types optimized for that market:
+
+- **Symbol Info**: Basic price and volume information
+- **Advanced Chart**: Interactive TradingView charts with multiple timeframes
+- **Technical Analysis**: Automated technical analysis and recommendations
+- **Company Profile**: Detailed company/asset information
+- **Economic Calendar**: Upcoming economic events and releases
+- **News Feed**: Real-time financial news and market updates
+- **Market Overview**: Sector-specific market overviews and heatmaps

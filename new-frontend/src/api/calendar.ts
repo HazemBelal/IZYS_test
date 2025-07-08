@@ -1,7 +1,7 @@
 export interface EconomicEvent {
   date: string;
   time: string;
-  timezone: string;
+  utcTime: string | null;
   currency: string;
   event: string;
   impact: string;
@@ -20,8 +20,8 @@ export interface CalendarResponse {
 
 const API_BASE = '/api';
 
-export async function getCalendarData(timeframe: string, timezone: string): Promise<CalendarResponse> {
-  const params = new URLSearchParams({ timeframe, timezone });
+export async function getCalendarData(timeframe: string): Promise<CalendarResponse> {
+  const params = new URLSearchParams({ timeframe });
   const response = await fetch(`${API_BASE}/calendar?${params}`);
   
   if (!response.ok) {

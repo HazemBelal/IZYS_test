@@ -18,14 +18,27 @@ import * as symbolsApi from '../../api/symbols';
 import { useDashboard } from '../../context/DashboardContext';
 import { useDebounce } from '../../hooks/useDebounce';
 
+// TradingView market categories available for widgets
+// These map to TradingView Screener API markets:
+// - forex: Foreign exchange pairs
+// - crypto: Cryptocurrencies  
+// - stocks: US stocks (america market)
+// - futures: Futures contracts
+// - bonds: Government and corporate bonds
+// - etfs: Exchange-traded funds (filtered from america market)
+// - options: Options contracts
+// - indices: Market indices
 const CATEGORIES = [
   { label: 'Forex', value: 'forex' },
   { label: 'Crypto', value: 'crypto' },
   { label: 'Stocks', value: 'stocks' },
+  { label: 'Futures', value: 'futures' },
+  { label: 'Bonds', value: 'bonds' },
+  { label: 'ETFs', value: 'etfs' },
 ];
 
 // Widget definitions per category (preserved from your logic)
-const getWidgetDefinitions = (symbol: string, category: string) => {
+const getWidgetDefinitions = (symbol: string, category: string, underlyingSymbol?: string) => {
   if (!symbol) return [];
   switch (category) {
     case "stocks":
@@ -36,7 +49,7 @@ const getWidgetDefinitions = (symbol: string, category: string) => {
           script_src: "https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js",
           config: {
             symbol: symbol,
-            width: "100%",
+            width: 960,
             locale: "en",
             colorTheme: "light",
             isTransparent: true,
@@ -66,8 +79,8 @@ const getWidgetDefinitions = (symbol: string, category: string) => {
           name: "Company Profile",
           script_src: "https://s3.tradingview.com/external-embedding/embed-widget-symbol-profile.js",
           config: {
-            width: "100%",
-            height: "100%",
+            width: 960,
+            height: 390,
             colorTheme: "light",
             isTransparent: true,
             symbol: symbol,
@@ -84,8 +97,8 @@ const getWidgetDefinitions = (symbol: string, category: string) => {
             isTransparent: true,
             largeChartUrl: "",
             displayMode: "adaptive",
-            width: "100%",
-            height: "100%",
+            width: 960,
+            height: 490,
             symbol: symbol,
             locale: "en",
           },
@@ -97,9 +110,9 @@ const getWidgetDefinitions = (symbol: string, category: string) => {
           script_src: "https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js",
           config: {
             interval: "15m",
-            width: "100%",
+            width: 460,
             isTransparent: true,
-            height: "100%",
+            height: 425,
             symbol: symbol,
             showIntervalTabs: true,
             displayMode: "single",
@@ -118,8 +131,8 @@ const getWidgetDefinitions = (symbol: string, category: string) => {
             colorTheme: "light",
             isTransparent: true,
             displayMode: "regular",
-            width: "100%",
-            height: "100%",
+            width: 460,
+            height: 425,
             locale: "en",
           },
           default: { x: 480, y: 1660, width: 460, height: 425 }
@@ -133,7 +146,7 @@ const getWidgetDefinitions = (symbol: string, category: string) => {
           script_src: "https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js",
           config: {
             symbol: symbol,
-            width: "100%",
+            width: 960,
             locale: "en",
             colorTheme: "light",
             isTransparent: true,
@@ -163,8 +176,8 @@ const getWidgetDefinitions = (symbol: string, category: string) => {
           name: "Company Profile",
           script_src: "https://s3.tradingview.com/external-embedding/embed-widget-symbol-profile.js",
           config: {
-            width: "100%",
-            height: "100%",
+            width: 960,
+            height: 390,
             colorTheme: "light",
             isTransparent: true,
             symbol: symbol,
@@ -178,9 +191,9 @@ const getWidgetDefinitions = (symbol: string, category: string) => {
           script_src: "https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js",
           config: {
             interval: "15m",
-            width: "100%",
+            width: 460,
             isTransparent: true,
-            height: "100%",
+            height: 425,
             symbol: symbol,
             showIntervalTabs: true,
             displayMode: "single",
@@ -199,8 +212,8 @@ const getWidgetDefinitions = (symbol: string, category: string) => {
             colorTheme: "light",
             isTransparent: true,
             displayMode: "regular",
-            width: "100%",
-            height: "100%",
+            width: 460,
+            height: 425,
             locale: "en",
           },
           default: { x: 480, y: 1150, width: 460, height: 425 }
@@ -210,8 +223,8 @@ const getWidgetDefinitions = (symbol: string, category: string) => {
           name: "Coins Heatmap",
           script_src: "https://s3.tradingview.com/external-embedding/embed-widget-crypto-coins-heatmap.js",
           config: {
-            width: "100%",
-            height: "100%",
+            width: 460,
+            height: 400,
             colorTheme: "light",
             isTransparent: true,
             locale: "en",
@@ -223,8 +236,8 @@ const getWidgetDefinitions = (symbol: string, category: string) => {
           name: "Crypto Market",
           script_src: "https://s3.tradingview.com/external-embedding/embed-widget-cryptocurrency-market.js",
           config: {
-            width: "100%",
-            height: "100%",
+            width: 460,
+            height: 400,
             colorTheme: "light",
             isTransparent: true,
             locale: "en",
@@ -240,7 +253,7 @@ const getWidgetDefinitions = (symbol: string, category: string) => {
           script_src: "https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js",
           config: {
             symbol: symbol,
-            width: "100%",
+            width: 960,
             locale: "en",
             colorTheme: "light",
             isTransparent: true,
@@ -270,8 +283,8 @@ const getWidgetDefinitions = (symbol: string, category: string) => {
           name: "Company Profile",
           script_src: "https://s3.tradingview.com/external-embedding/embed-widget-symbol-profile.js",
           config: {
-            width: "100%",
-            height: "100%",
+            width: 960,
+            height: 390,
             colorTheme: "light",
             isTransparent: true,
             symbol: symbol,
@@ -285,9 +298,9 @@ const getWidgetDefinitions = (symbol: string, category: string) => {
           script_src: "https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js",
           config: {
             interval: "15m",
-            width: "100%",
+            width: 460,
             isTransparent: true,
-            height: "100%",
+            height: 425,
             symbol: symbol,
             showIntervalTabs: true,
             displayMode: "single",
@@ -306,8 +319,8 @@ const getWidgetDefinitions = (symbol: string, category: string) => {
             colorTheme: "light",
             isTransparent: true,
             displayMode: "regular",
-            width: "100%",
-            height: "100%",
+            width: 460,
+            height: 425,
             locale: "en",
           },
           default: { x: 480, y: 1150, width: 460, height: 425 }
@@ -315,30 +328,208 @@ const getWidgetDefinitions = (symbol: string, category: string) => {
         {
           id: "economic-calendar",
           name: "Economic Calendar",
-          script_src: "https://s3.tradingview.com/external-embedding/embed-widget-economic-calendar.js",
+          script_src: "https://s3.tradingview.com/external-embedding/embed-widget-events.js",
           config: {
-            width: "100%",
-            height: "100%",
             colorTheme: "light",
             isTransparent: true,
             locale: "en",
+            countryFilter: "ar,au,br,ca,cn,fr,de,in,id,it,jp,kr,mx,ru,sa,za,tr,gb,us,eu",
+            importanceFilter: "-1,0,1",
+            width: 960,
+            height: 550,
           },
-          default: { x: 0, y: 1600, width: 960, height: 150 }
+          default: { x: 0, y: 1600, width: 960, height: 550 }
         },
         {
           id: "forex-cross-rates",
           name: "Forex Cross Rates",
           script_src: "https://s3.tradingview.com/external-embedding/embed-widget-forex-cross-rates.js",
           config: {
-            width: "100%",
-            height: "100%",
+            width: 960,
+            height: 400,
             colorTheme: "light",
             isTransparent: true,
             locale: "en",
           },
-          default: { x: 0, y: 1770, width: 960, height: 400 }
+          default: { x: 0, y: 2170, width: 960, height: 400 }
         }
       ];
+    case "futures":
+      return [
+        {
+          id: "technical-analysis",
+          name: "Technical Analysis",
+          script_src: "https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js",
+          config: {
+            interval: "15m",
+            width: 460,
+            isTransparent: true,
+            height: 425,
+            symbol: symbol,
+            showIntervalTabs: true,
+            displayMode: "single",
+            locale: "en",
+            colorTheme: "light",
+          },
+          default: { x: 0, y: 0, width: 460, height: 425 }
+        },
+        {
+          id: "economic-calendar",
+          name: "Economic Calendar",
+          script_src: "https://s3.tradingview.com/external-embedding/embed-widget-events.js",
+          config: {
+            colorTheme: "light",
+            isTransparent: true,
+            locale: "en",
+            countryFilter: "ar,au,br,ca,cn,fr,de,in,id,it,jp,kr,mx,ru,sa,za,tr,gb,us,eu",
+            importanceFilter: "-1,0,1",
+            width: 460,
+            height: 550,
+          },
+          default: { x: 480, y: 0, width: 460, height: 550 }
+        }
+      ];
+    case "bonds":
+      return [
+        {
+          id: "technical-analysis",
+          name: "Technical Analysis",
+          script_src: "https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js",
+          config: {
+            interval: "15m",
+            width: 460,
+            isTransparent: true,
+            height: 425,
+            symbol: symbol,
+            showIntervalTabs: true,
+            displayMode: "single",
+            locale: "en",
+            colorTheme: "light",
+          },
+          default: { x: 0, y: 0, width: 460, height: 425 }
+        },
+        {
+          id: "economic-calendar",
+          name: "Economic Calendar",
+          script_src: "https://s3.tradingview.com/external-embedding/embed-widget-events.js",
+          config: {
+            colorTheme: "light",
+            isTransparent: true,
+            locale: "en",
+            countryFilter: "ar,au,br,ca,cn,fr,de,in,id,it,jp,kr,mx,ru,sa,za,tr,gb,us,eu",
+            importanceFilter: "-1,0,1",
+            width: 460,
+            height: 550,
+          },
+          default: { x: 480, y: 0, width: 460, height: 550 }
+        }
+      ];
+    case "etfs":
+      return [
+        {
+          id: "symbol-info",
+          name: "Symbol Info",
+          script_src: "https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js",
+          config: {
+            symbol: symbol,
+            width: 960,
+            locale: "en",
+            colorTheme: "light",
+            isTransparent: true,
+          },
+          default: { x: 0, y: 0, width: 960, height: 200 }
+        },
+        {
+          id: "advanced-chart",
+          name: "Advanced Chart",
+          script_src: "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js",
+          config: {
+            autosize: true,
+            symbol: symbol,
+            interval: "D",
+            timezone: "Etc/UTC",
+            theme: "light",
+            style: "1",
+            locale: "en",
+            allow_symbol_change: true,
+            calendar: false,
+            support_host: "https://www.tradingview.com",
+          },
+          default: { x: 0, y: 220, width: 960, height: 500 }
+        },
+        {
+          id: "company-profile",
+          name: "ETF Profile",
+          script_src: "https://s3.tradingview.com/external-embedding/embed-widget-symbol-profile.js",
+          config: {
+            width: 960,
+            height: 390,
+            colorTheme: "light",
+            isTransparent: true,
+            symbol: symbol,
+            locale: "en",
+          },
+          default: { x: 0, y: 740, width: 960, height: 390 }
+        },
+        {
+          id: "technical-analysis",
+          name: "Technical Analysis",
+          script_src: "https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js",
+          config: {
+            interval: "15m",
+            width: 460,
+            isTransparent: true,
+            height: 425,
+            symbol: symbol,
+            showIntervalTabs: true,
+            displayMode: "single",
+            locale: "en",
+            colorTheme: "light",
+          },
+          default: { x: 0, y: 1150, width: 460, height: 425 }
+        },
+        {
+          id: "top-stories",
+          name: "Top Stories",
+          script_src: "https://s3.tradingview.com/external-embedding/embed-widget-timeline.js",
+          config: {
+            feedMode: "symbol",
+            symbol: symbol,
+            colorTheme: "light",
+            isTransparent: true,
+            displayMode: "regular",
+            width: 460,
+            height: 425,
+            locale: "en",
+          },
+          default: { x: 480, y: 1150, width: 460, height: 425 }
+        },
+        {
+          id: "etf-heatmap",
+          name: "ETF Heatmap",
+          script_src: "https://s3.tradingview.com/external-embedding/embed-widget-etf-heatmap.js",
+          config: {
+            dataSource: "AllUSEtf",
+            blockSize: "volume",
+            blockColor: "change",
+            grouping: "asset_class",
+            locale: "en",
+            symbolUrl: "",
+            colorTheme: "light",
+            hasTopBar: false,
+            isDataSetEnabled: false,
+            isZoomEnabled: true,
+            hasSymbolTooltip: true,
+            isMonoSize: false,
+            width: 960,
+            height: 400,
+            isTransparent: true,
+          },
+          default: { x: 0, y: 1600, width: 960, height: 400 }
+        }
+      ];
+
+
     default:
       return [];
   }
@@ -357,6 +548,8 @@ const WidgetGallery: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
   const listRef = useRef<HTMLUListElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { addWidget } = useDashboard();
+  
+
 
   // Utility function to deduplicate symbols by ID
   const deduplicateSymbols = (symbolsArray: any[]): any[] => {
@@ -377,6 +570,8 @@ const WidgetGallery: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
     setSearch('');
     setPage(1);
     setHasMore(true);
+    
+
   }, [category]);
 
   // Fetch symbols (paginated)
@@ -385,7 +580,23 @@ const WidgetGallery: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
     const fetchSymbols = async () => {
       setLoading(true);
       try {
-        if (debouncedSearch.length > 1) {
+        if (['etfs', 'futures', 'bonds'].includes(category)) {
+          // Use database-based endpoints for these categories
+          const response = await symbolsApi.getPaginatedData(category, 1, 20);
+          if (!ignore) {
+            const dataArray = response[category] || [];
+            setSymbols(dataArray.map((item: any, idx: number) => ({
+              id: item.id || item.symbol || idx,
+              symbol: item.symbol,
+              name: item.name,
+              description: item.description || item.name,
+              exchange: item.exchange,
+              category: category,
+            })));
+            setHasMore(response.page < response.totalPages);
+            setPage(1);
+          }
+        } else if (debouncedSearch.length > 1) {
           const results = await symbolsApi.searchSymbols(category, debouncedSearch);
           if (!ignore) {
             setSymbols(deduplicateSymbols(results));
@@ -421,6 +632,40 @@ const WidgetGallery: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
       scrollTimeoutRef.current = setTimeout(() => {
         setLoadingMore(true);
         
+        if (['etfs', 'futures', 'bonds'].includes(category)) {
+          // Handle database-based category pagination
+          symbolsApi.getPaginatedData(category, page + 1, 20)
+            .then((response) => {
+              const dataArray = response[category] || [];
+              if (dataArray && dataArray.length > 0) {
+                setSymbols((prev) => {
+                  // Combine existing and new symbols, then deduplicate
+                  const newSymbols = dataArray.map((item: any, idx: number) => ({
+                    id: item.id || item.symbol || `${page + 1}-${idx}`,
+                    symbol: item.symbol,
+                    name: item.name,
+                    description: item.description || item.name,
+                    exchange: item.exchange,
+                    category: category,
+                  }));
+                  const combined = [...prev, ...newSymbols];
+                  return deduplicateSymbols(combined);
+                });
+                setPage((p) => p + 1);
+                setHasMore(response.page < response.totalPages);
+              } else {
+                setHasMore(false);
+              }
+            })
+            .catch((error: any) => {
+              console.error(`Error loading more ${category}:`, error);
+              setHasMore(false);
+            })
+            .finally(() => {
+              setLoadingMore(false);
+            });
+        } else {
+          // Handle other categories
         symbolsApi.getPaginatedSymbols(category, page + 1)
           .then(({ symbols: more, hasMore: moreHasMore }: { symbols: any[], hasMore: boolean }) => {
             if (more && more.length > 0) {
@@ -442,6 +687,7 @@ const WidgetGallery: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
           .finally(() => {
             setLoadingMore(false);
           });
+        }
       }, 150); // 150ms debounce
     }
   }, [category, page, hasMore, loadingMore, search.length, deduplicateSymbols]);
@@ -459,7 +705,7 @@ const WidgetGallery: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
     };
   }, [handleScroll]);
 
-  const widgets = selectedSymbol ? getWidgetDefinitions(selectedSymbol.symbol, category) : [];
+  const widgets = selectedSymbol ? getWidgetDefinitions(selectedSymbol.symbol, category, selectedSymbol.underlying) : [];
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -472,6 +718,7 @@ const WidgetGallery: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
         </Tabs>
         <Box sx={{ display: 'flex', gap: 3 }}>
           <Box sx={{ flex: 1 }}>
+
             <TextField
               label="Search symbols"
               value={search}

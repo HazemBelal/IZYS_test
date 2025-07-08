@@ -11,7 +11,9 @@ export const CATEGORY_MAP = {
   stocks:      'america',
   actions:     'america',
   bonds:       'bonds',
-  commodities: 'futures',
+  futures:     'futures',
+  etfs:        'america', // ETFs are part of the america market
+
   indices:     'index'
 };
 
@@ -59,6 +61,14 @@ export const scrapeTradingViewSymbols = async (category) => {
 
     const json = await res.json();
     const data = Array.isArray(json.data) ? json.data : [];
+    
+    // Debug logging for problematic categories
+    if (category === 'indices') {
+      console.log(`🔍 [${category}] Raw data count: ${data.length}`);
+      if (data.length > 0) {
+        console.log(`🔍 [${category}] Sample data:`, data.slice(0, 3));
+      }
+    }
 
     // 1) Delete just this category
     await db.query('DELETE FROM financial_symbols WHERE category = ?', [category]);
@@ -66,6 +76,10 @@ export const scrapeTradingViewSymbols = async (category) => {
       // Also clear both stocks and actions if scraping either
       await db.query('DELETE FROM financial_symbols WHERE category = ?', ['actions']);
       await db.query('DELETE FROM financial_symbols WHERE category = ?', ['stocks']);
+    }
+    if (category === 'etfs') {
+      // Clear ETFs category
+      await db.query('DELETE FROM financial_symbols WHERE category = ?', ['etfs']);
     }
 
     // 2) Build upsert values
@@ -95,6 +109,41 @@ export const scrapeTradingViewSymbols = async (category) => {
           idx
         ]);
       });
+    } else if (category === 'etfs') {
+      // Include more ETFs by using a broader filter
+      values = data
+        .filter(r => typeof r.s === 'string' && 
+                (r.d[1]?.toLowerCase().includes('etf') || 
+                 r.d[0]?.toLowerCase().includes('etf') ||
+                 r.s.toLowerCase().includes('etf') ||
+                 r.s.toLowerCase().includes('spy') ||
+                 r.s.toLowerCase().includes('qqq') ||
+                 r.s.toLowerCase().includes('dia') ||
+                 r.s.toLowerCase().includes('vti') ||
+                 r.s.toLowerCase().includes('voo') ||
+                 r.s.toLowerCase().includes('ivv') ||
+                 r.s.toLowerCase().includes('schb') ||
+                 r.s.toLowerCase().includes('itot')))
+        .map((r, idx) => {
+          const [exchange, symbol] = r.s.split(':');
+          let rawDesc = r.d[0] || '';
+          const description = rawDesc.split(' on ')[0].trim();
+          const currency = 'USD';
+          return [
+            `${exchange}:${symbol}`.replace(/\s+/g,''),
+            symbol,
+            r.d[1] || symbol,
+            description,
+            'etf',
+            'etfs',
+            exchange,
+            currency,
+            'Global',
+            'ETF',
+            'Exchange Traded Fund',
+            idx
+          ];
+        });
     } else {
       values = data
         .filter(r => typeof r.s === 'string')
@@ -113,6 +162,10 @@ export const scrapeTradingViewSymbols = async (category) => {
             description,
             category === 'crypto' ? 'cryptocurrency'
             : category === 'forex' ? 'currency'
+            : category === 'bonds' ? 'bond'
+            : category === 'futures' ? 'future'
+    
+            : category === 'indices' ? 'index'
             : 'stock',
             dbCategory,
             exchange,
