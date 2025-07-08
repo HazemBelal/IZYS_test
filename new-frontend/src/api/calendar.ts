@@ -1,4 +1,5 @@
 export interface EconomicEvent {
+  eventId: string;
   date: string;
   time: string;
   utcTime: string | null;
@@ -12,6 +13,7 @@ export interface EconomicEvent {
   previous: string;
   previousClass?: string;
   previousTitle?: string;
+  hasGraph?: boolean;
 }
 
 export interface CalendarResponse {

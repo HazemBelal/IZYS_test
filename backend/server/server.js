@@ -28,6 +28,7 @@ import {
 } from '../scraper/newsScraper.js';
 
 import { scrapeForexFactoryRange } from '../scraper/calendarScraper.js';
+import { scrapeGraphData } from '../scraper/graphScraper.js';
 import symbolScraperModule from '../scraper/SymbolsScraper.js';
 
 
@@ -152,6 +153,34 @@ app.use((req, res, next) => {
     ].join('; ')
   );
   next();
+});
+
+app.get('/api/calendar/graph/:eventId', async (req, res) => {
+  const { eventId } = req.params;
+  if (!eventId) {
+    return res.status(400).json({ error: 'Event ID is required' });
+  }
+
+  const cacheKey = `graph:${eventId}`;
+
+  try {
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      console.log(`CACHE HIT for graph: ${eventId}`);
+      return res.json(JSON.parse(cachedData));
+    }
+
+    console.log(`CACHE MISS for graph: ${eventId}. Scraping...`);
+    const graphData = await scrapeGraphData(eventId);
+
+    // Cache for 1 hour
+    await redisClient.set(cacheKey, JSON.stringify(graphData), { EX: 3600 });
+
+    res.json(graphData);
+  } catch (error) {
+    console.error(`Error fetching graph data for event ${eventId}:`, error);
+    res.status(500).json({ error: 'Failed to fetch graph data' });
+  }
 });
 
 // --------------------------

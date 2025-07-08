@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
@@ -11,11 +11,26 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import CircularProgress from '@mui/material/CircularProgress';
 import Chip from '@mui/material/Chip';
+import Collapse from '@mui/material/Collapse';
 import { getCalendarData } from '../../api/calendar';
 import type { EconomicEvent } from '../../api/calendar';
 import { DateTime } from 'luxon';
 import Autocomplete from '@mui/material/Autocomplete';
 import TextField from '@mui/material/TextField';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterLuxon } from '@mui/x-date-pickers/AdapterLuxon';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import Drawer from '@mui/material/Drawer';
+import FormGroup from '@mui/material/FormGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
+import Divider from '@mui/material/Divider';
+import IconButton from '@mui/material/IconButton';
+import CloseIcon from '@mui/icons-material/Close';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import EventGraph from './EventGraph';
+
 
 // Extend EconomicEvent to include localTime for grouping
 interface LocalEconomicEvent extends EconomicEvent {
@@ -23,6 +38,105 @@ interface LocalEconomicEvent extends EconomicEvent {
   noTime?: boolean; // Flag to indicate if this event has no time
   displayTime?: string; // To hold special time strings like "Tentative"
 }
+
+interface EventRowProps {
+  event: LocalEconomicEvent;
+  getImpactStyling: (impact: string) => { bgcolor: string; color: string };
+  getValueColor: (valueClass?: string) => 'success' | 'error' | 'default';
+  displayValue: (value?: string) => string;
+}
+
+// EventRow component to handle rendering of a single event and its expandable graph
+const EventRow = ({ event, getImpactStyling, getValueColor, displayValue }: EventRowProps) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <React.Fragment>
+      <TableRow hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+        <TableCell>
+          {event.hasGraph && (
+            <IconButton
+              aria-label="expand row"
+              size="small"
+              onClick={() => setExpanded(!expanded)}
+            >
+              <TimelineIcon />
+            </IconButton>
+          )}
+        </TableCell>
+        <TableCell component="th" scope="row">
+          <Typography variant="body2" fontWeight="medium">
+            {event.displayTime
+              ? event.displayTime
+              : event.noTime
+                ? 'TBD'
+                : event.localTime.toFormat('h:mm a')
+            }
+          </Typography>
+        </TableCell>
+        <TableCell>
+          <Typography variant="body2" fontWeight="medium">
+            {event.currency}
+          </Typography>
+        </TableCell>
+        <TableCell>
+          <Typography variant="body2">
+            {event.event}
+          </Typography>
+        </TableCell>
+        <TableCell>
+          <Chip 
+            label={event.impact} 
+            size="small"
+            sx={{
+              ...getImpactStyling(event.impact),
+              fontWeight: 'medium',
+              textTransform: 'capitalize',
+              borderRadius: '6px',
+              px: '4px'
+            }}
+          />
+        </TableCell>
+        <TableCell>
+          <Typography 
+            variant="body2" 
+            fontWeight="bold"
+            color={getValueColor(event.actualClass)}
+          >
+            {displayValue(event.actual)}
+          </Typography>
+        </TableCell>
+        <TableCell>
+          <Typography variant="body2">
+            {displayValue(event.forecast)}
+          </Typography>
+        </TableCell>
+        <TableCell>
+          <Typography 
+            variant="body2" 
+            fontWeight="bold"
+            color={getValueColor(event.previousClass)}
+          >
+            {displayValue(event.previous)}
+          </Typography>
+        </TableCell>
+      </TableRow>
+      <TableRow>
+        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
+          <Collapse in={expanded} timeout="auto" unmountOnExit>
+            <Box sx={{ margin: 1, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+              <Typography variant="h6" gutterBottom component="div">
+                Graph for {event.event}
+              </Typography>
+              {expanded && <EventGraph eventId={event.eventId} eventName={event.event} />}
+            </Box>
+          </Collapse>
+        </TableCell>
+      </TableRow>
+    </React.Fragment>
+  );
+};
+
 
 // ForexFactory timezone list (parsed from timezonelist.txt)
 const FOREX_FACTORY_TIMEZONES = [
@@ -169,6 +283,35 @@ const CalendarTab: React.FC = () => {
   const [events, setEvents] = useState<EconomicEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState('today');
+  const [customDate, setCustomDate] = useState<DateTime | null>(null);
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+
+  // --- Filter States ---
+  // Main state for active filters
+  const allImpacts = useMemo(() => ['high', 'medium', 'low', 'non-economic'], []);
+  const [selectedImpacts, setSelectedImpacts] = useState<string[]>(allImpacts);
+  const [selectedCurrencies, setSelectedCurrencies] = useState<string[]>([]);
+  
+  // Temporary state while the drawer is open
+  const [tempSelectedImpacts, setTempSelectedImpacts] = useState<string[]>(allImpacts);
+  const [tempSelectedCurrencies, setTempSelectedCurrencies] = useState<string[]>([]);
+
+  const allCurrencies = useMemo(() => {
+    const currencies = new Set(events.map(e => e.currency).filter(c => c));
+    return Array.from(currencies).sort();
+  }, [events]);
+  
+  const [isCurrenciesInitialized, setIsCurrenciesInitialized] = useState(false);
+  
+  useEffect(() => {
+    // This effect initializes the currency filters once when events are loaded.
+    if (allCurrencies.length > 0 && !isCurrenciesInitialized) {
+      setSelectedCurrencies(allCurrencies);
+      setTempSelectedCurrencies(allCurrencies);
+      setIsCurrenciesInitialized(true);
+    }
+  }, [allCurrencies, isCurrenciesInitialized]);
+
   // Timezone selector state
   const [selectedTimezone, setSelectedTimezone] = useState(
     localStorage.getItem('calendarTimezone') || Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -214,13 +357,41 @@ const CalendarTab: React.FC = () => {
     }
   };
 
-  // Fetch data when the component mounts or viewMode changes
+  // Fetch data when the component mounts or viewMode/customDate changes
   useEffect(() => {
-    fetchCalendarData(viewMode);
-  }, [viewMode]);
+    let timeframeToFetch = viewMode;
+
+    if (viewMode === 'custom' && customDate) {
+      // Fetch the whole week for the selected date to handle timezone boundaries.
+      const startOfWeek = customDate.startOf('week'); 
+      timeframeToFetch = `week-${startOfWeek.toISODate()}`;
+    } else if (['today', 'tomorrow', 'yesterday'].includes(viewMode)) {
+      // Also fetch the current week for the preset day-views.
+      timeframeToFetch = 'thisWeek';
+    }
+    
+    // Don't fetch if a custom date is selected but not yet valid.
+    if (viewMode === 'custom' && !customDate) return;
+
+    // We no longer need to check this on the frontend, the backend handles it.
+    // timeframeToFetch = customDate.toISODate() || '';
+    
+    fetchCalendarData(timeframeToFetch);
+  }, [viewMode, customDate]);
+
+
+  // Apply filters before grouping
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => {
+      const impactMatch = selectedImpacts.length === 0 || selectedImpacts.includes(event.impact);
+      const currencyMatch = selectedCurrencies.length === 0 || selectedCurrencies.includes(event.currency);
+      return impactMatch && currencyMatch;
+    });
+  }, [events, selectedImpacts, selectedCurrencies]);
+
 
   // Group events by local day using a more robust processing function
-  const groupedEvents = events.reduce((acc: Record<string, LocalEconomicEvent[]>, event) => {
+  const groupedEvents = filteredEvents.reduce((acc: Record<string, LocalEconomicEvent[]>, event) => {
     const timeStr = event.time || '';
     const isSpecificTime = timeStr.includes(':') || /am|pm/i.test(timeStr);
     const isSpecialTime = !isSpecificTime && timeStr && !['N/A', 'TBD', 'undefined', ''].includes(timeStr.trim());
@@ -270,12 +441,11 @@ const CalendarTab: React.FC = () => {
 
   // Filter dates to show based on the selected view mode
   const datesToShow = Object.keys(groupedEvents).filter(dateKey => {
-    // For weekly/monthly views, we show everything.
-    if (!['today', 'tomorrow', 'yesterday'].includes(viewMode)) {
+    // For weekly/monthly views, show everything fetched.
+    if (['thisWeek', 'nextWeek', 'lastWeek', 'thisMonth', 'nextMonth', 'lastMonth'].includes(viewMode)) {
       return true;
     }
     
-    // For daily views, only show dates that match the user's local day.
     // This regex ensures we only try to parse valid YYYY-MM-DD keys.
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
       return false;
@@ -292,6 +462,9 @@ const CalendarTab: React.FC = () => {
     if (viewMode === 'yesterday') {
       return eventDate.hasSame(localToday.minus({ days: 1 }), 'day');
     }
+    if (viewMode === 'custom' && customDate) {
+      return eventDate.hasSame(customDate, 'day');
+    }
     
     return false;
   }).sort();
@@ -304,17 +477,17 @@ const CalendarTab: React.FC = () => {
     return value;
   };
 
-  // Get impact color
-  const getImpactColor = (impact: string) => {
-    switch (impact) {
+  // Get styling for the impact chip
+  const getImpactStyling = (impact: string) => {
+    switch (impact?.toLowerCase()) {
       case 'high':
-        return 'error';
+        return { bgcolor: '#ffcdd2', color: '#c62828' }; // Light Red BG, Dark Red Text
       case 'medium':
-        return 'warning';
+        return { bgcolor: '#ffecb3', color: '#ff8f00' }; // Light Amber BG, Dark Amber Text
       case 'low':
-        return 'success';
+        return { bgcolor: '#c8e6c9', color: '#2e7d32' }; // Light Green BG, Dark Green Text
       default:
-        return 'default';
+        return { bgcolor: '#e0e0e0', color: '#424242' }; // Grey
     }
   };
 
@@ -330,153 +503,253 @@ const CalendarTab: React.FC = () => {
     'thisMonth', 'nextMonth', 'lastWeek', 'lastMonth'
   ];
 
-  return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        Economic Calendar
-      </Typography>
-      
-      {/* Timezone Selector */}
-      <Box sx={{ mb: 2, width: 350 }}>
-        <Autocomplete
-          options={FOREX_FACTORY_TIMEZONES}
-          getOptionLabel={option => option.label}
-          value={FOREX_FACTORY_TIMEZONES.find(tz => tz.value === selectedTimezone) || null}
-          onChange={(_, newValue) => {
-            if (newValue) setSelectedTimezone(newValue.value);
-          }}
-          renderInput={(params) => (
-            <TextField {...params} label="Timezone" variant="outlined" size="small" />
-          )}
-          isOptionEqualToValue={(option, value) => option.value === value.value}
-          sx={{ background: 'white', borderRadius: 1 }}
-        />
-      </Box>
+  const applyFilters = () => {
+    setSelectedImpacts(tempSelectedImpacts);
+    setSelectedCurrencies(tempSelectedCurrencies);
+    setIsFilterDrawerOpen(false);
+  };
 
-      <Paper sx={{ overflow: 'hidden' }}>
-        {/* Filter Buttons */}
-        <Box sx={{ 
-          display: 'flex', 
-          flexWrap: 'wrap', 
-          gap: 1, 
-          p: 2, 
-          bgcolor: 'grey.100',
-          borderBottom: 1,
-          borderColor: 'grey.300'
-        }}>
-          {timeframes.map((preset) => (
-            <Button
-              key={preset}
-              variant={viewMode === preset ? 'contained' : 'outlined'}
-              size="small"
-              onClick={() => setViewMode(preset)}
-              sx={{ textTransform: 'capitalize' }}
-            >
-              {preset.replace(/([A-Z])/g, ' $1').trim()}
-            </Button>
-          ))}
+  return (
+    <LocalizationProvider dateAdapter={AdapterLuxon}>
+      <Box sx={{ p: 3, bgcolor: 'grey.100', minHeight: 'calc(100vh - 64px)' }}>
+        <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: 'text.primary', mb: 3 }}>
+          Economic Calendar
+        </Typography>
+        
+        {/* --- Controls --- */}
+        <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Timezone Selector */}
+          <Box sx={{ width: 350 }}>
+            <Autocomplete
+              options={FOREX_FACTORY_TIMEZONES}
+              getOptionLabel={option => option.label}
+              value={FOREX_FACTORY_TIMEZONES.find(tz => tz.value === selectedTimezone) || null}
+              onChange={(_, newValue) => {
+                if (newValue) setSelectedTimezone(newValue.value);
+              }}
+              renderInput={(params) => (
+                <TextField {...params} label="Timezone" variant="outlined" size="small" />
+              )}
+              isOptionEqualToValue={(option, value) => option.value === value.value}
+              sx={{ background: 'white', borderRadius: 1 }}
+            />
+          </Box>
+          {/* Date Picker */}
+          <DatePicker
+            label="Specific date"
+            value={customDate}
+            onChange={(newValue) => {
+              setViewMode('custom');
+              setCustomDate(newValue);
+            }}
+            slotProps={{
+              textField: {
+                size: 'small',
+                sx: { bgcolor: 'white', borderRadius: 1 }
+              },
+            }}
+          />
+          <Button
+            variant="outlined"
+            startIcon={<FilterListIcon />}
+            onClick={() => {
+              // On open, sync temp state with main state
+              setTempSelectedImpacts(selectedImpacts);
+              setTempSelectedCurrencies(selectedCurrencies);
+              setIsFilterDrawerOpen(true);
+            }}
+            sx={{ bgcolor: 'white', ml: 'auto' }}
+          >
+            Filter
+          </Button>
         </Box>
 
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <Box sx={{ p: 2 }}>
-            {Object.keys(groupedEvents).length === 0 ? (
-              <Typography variant="body1" color="text.secondary" align="center" sx={{ py: 4 }}>
-                No events found for this timeframe.
-              </Typography>
-            ) : (
-              datesToShow.map((date) => (
-                <Box key={date} sx={{ mb: 4 }}>
-                  <Typography variant="h6" sx={{ mb: 2, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
-                    {date.startsWith('tbd-') 
-                      ? `${date.replace('tbd-', '')} - Time TBD`
-                      : date.startsWith('fallback-')
-                        ? `${date.replace('fallback-', '')} - Approximate Time`
-                        : date
-                    }
-                  </Typography>
-                  <TableContainer component={Paper} variant="outlined">
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Time</TableCell>
-                          <TableCell>Currency</TableCell>
-                          <TableCell>Event</TableCell>
-                          <TableCell>Impact</TableCell>
-                          <TableCell>Actual</TableCell>
-                          <TableCell>Forecast</TableCell>
-                          <TableCell>Previous</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {groupedEvents[date].map((event, index) => (
-                          <TableRow key={index} hover>
-                            <TableCell>
-                              <Typography variant="body2">
-                                {event.displayTime
-                                  ? event.displayTime
-                                  : event.noTime
-                                    ? 'TBD'
-                                    : event.localTime.toFormat('h:mm a')
-                                }
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" fontWeight="medium">
-                                {event.currency}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" fontWeight="medium">
-                                {event.event}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={event.impact} 
-                                color={getImpactColor(event.impact)}
-                                size="small"
-                                variant="outlined"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Typography 
-                                variant="body2" 
-                                fontWeight="bold"
-                                color={getValueColor(event.actualClass)}
-                              >
-                                {displayValue(event.actual)}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2">
-                                {displayValue(event.forecast)}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography 
-                                variant="body2" 
-                                fontWeight="bold"
-                                color={getValueColor(event.previousClass)}
-                              >
-                                {displayValue(event.previous)}
-                              </Typography>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
+        <Drawer
+          anchor="right"
+          open={isFilterDrawerOpen}
+          onClose={() => setIsFilterDrawerOpen(false)}
+        >
+          <Box sx={{ width: 300, p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6">Filter Events</Typography>
+              <IconButton onClick={() => setIsFilterDrawerOpen(false)}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
+            <Divider />
+
+            <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1, mt: 2 }}>
+              {/* Impact Filters */}
+              <Box sx={{ mb: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography variant="subtitle1" fontWeight="bold">Impact</Typography>
+                  <Box>
+                    <Button size="small" onClick={() => setTempSelectedImpacts(allImpacts)}>All</Button>
+                    <Button size="small" onClick={() => setTempSelectedImpacts([])}>None</Button>
+                  </Box>
                 </Box>
-              ))
-            )}
+                <FormGroup>
+                  {allImpacts.map(impact => (
+                    <FormControlLabel
+                      key={impact}
+                      control={
+                        <Checkbox
+                          checked={tempSelectedImpacts.includes(impact)}
+                          onChange={() => setTempSelectedImpacts(prev => prev.includes(impact) ? prev.filter(i => i !== impact) : [...prev, impact])}
+                          size="small"
+                        />
+                      }
+                      label={<Typography variant="body2">{impact.charAt(0).toUpperCase() + impact.slice(1)}</Typography>}
+                    />
+                  ))}
+                </FormGroup>
+              </Box>
+
+              <Divider />
+
+              {/* Currency Filters */}
+              <Box sx={{ mt: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography variant="subtitle1" fontWeight="bold">Currencies</Typography>
+                  <Box>
+                    <Button size="small" onClick={() => setTempSelectedCurrencies(allCurrencies)}>All</Button>
+                    <Button size="small" onClick={() => setTempSelectedCurrencies([])}>None</Button>
+                  </Box>
+                </Box>
+                <FormGroup>
+                  {allCurrencies.map(currency => (
+                    <FormControlLabel
+                      key={currency}
+                      control={
+                        <Checkbox
+                          checked={tempSelectedCurrencies.includes(currency)}
+                          onChange={() => setTempSelectedCurrencies(prev => prev.includes(currency) ? prev.filter(c => c !== currency) : [...prev, currency])}
+                          size="small"
+                        />
+                      }
+                      label={<Typography variant="body2">{currency}</Typography>}
+                    />
+                  ))}
+                </FormGroup>
+              </Box>
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 1, mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={() => setIsFilterDrawerOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                fullWidth
+                onClick={applyFilters}
+              >
+                Apply
+              </Button>
+            </Box>
           </Box>
-        )}
-      </Paper>
-    </Box>
+        </Drawer>
+
+
+        <Paper sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+          {/* Filter Buttons */}
+          <Box sx={{ 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: 1, 
+            p: 2, 
+            bgcolor: 'grey.50',
+            borderBottom: 1,
+            borderColor: 'divider'
+          }}>
+            {timeframes.map((preset) => (
+              <Button
+                key={preset}
+                variant={viewMode === preset ? 'contained' : 'outlined'}
+                size="small"
+                onClick={() => {
+                  setViewMode(preset);
+                  setCustomDate(null);
+                }}
+                sx={{ textTransform: 'capitalize', borderRadius: 1.5, px: 1.5, py: 0.5 }}
+              >
+                {preset.replace(/([A-Z])/g, ' $1').trim()}
+              </Button>
+            ))}
+          </Box>
+
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
+              {datesToShow.length === 0 ? (
+                <Typography variant="body1" color="text.secondary" align="center" sx={{ py: 4 }}>
+                  No events found for this timeframe. Please select another date.
+                </Typography>
+              ) : (
+                datesToShow.map((date) => (
+                  <Box key={date} sx={{ mb: 4 }}>
+                    <Typography 
+                      variant="h6" 
+                      sx={{ 
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 1,
+                        mb: 2, 
+                        p: 1.5, 
+                        bgcolor: 'primary.main', 
+                        color: 'white', 
+                        borderRadius: 2, 
+                        fontWeight: 500 
+                      }}
+                    >
+                      {date.startsWith('tbd-')
+                        ? `Events for ${date.replace('tbd-', '')} (Time TBD)`
+                        : date.startsWith('fallback-')
+                          ? `Events for ${date.replace('fallback-', '')} (Approximate Time)`
+                          : DateTime.fromISO(date).toFormat('EEEE, d MMMM yyyy')
+                      }
+                    </Typography>
+                    <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                      <Table sx={{ tableLayout: 'fixed' }}>
+                        <TableHead sx={{ bgcolor: 'grey.50' }}>
+                          <TableRow>
+                            <TableCell sx={{ width: '80px', fontWeight: 'bold', color: 'text.secondary' }}>Graph</TableCell>
+                            <TableCell sx={{ width: '120px', fontWeight: 'bold', color: 'text.secondary' }}>Time</TableCell>
+                            <TableCell sx={{ width: '100px', fontWeight: 'bold', color: 'text.secondary' }}>Currency</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Event</TableCell>
+                            <TableCell sx={{ width: '150px', fontWeight: 'bold', color: 'text.secondary' }}>Impact</TableCell>
+                            <TableCell sx={{ width: '100px', fontWeight: 'bold', color: 'text.secondary' }}>Actual</TableCell>
+                            <TableCell sx={{ width: '100px', fontWeight: 'bold', color: 'text.secondary' }}>Forecast</TableCell>
+                            <TableCell sx={{ width: '100px', fontWeight: 'bold', color: 'text.secondary' }}>Previous</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {groupedEvents[date].map((event, index) => (
+                            <EventRow
+                              key={index}
+                              event={event}
+                              getImpactStyling={getImpactStyling}
+                              getValueColor={getValueColor}
+                              displayValue={displayValue}
+                            />
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                ))
+              )}
+            </Box>
+          )}
+        </Paper>
+      </Box>
+    </LocalizationProvider>
   );
 };
 
