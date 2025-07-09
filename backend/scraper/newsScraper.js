@@ -5,8 +5,36 @@ import httpsProxyAgentPkg from 'https-proxy-agent';
 import { createClient } from 'redis';
 import { loadCookies, formatCookies } from './cookieHelper.js';
 
+// --- Puppeteer Browser Management ---
+let browserInstance = null;
+async function getBrowser() {
+    if (browserInstance && browserInstance.isConnected()) return browserInstance;
+
+    console.log('🚀 Launching new persistent Puppeteer browser instance...');
+    const args = [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        // '--disable-gpu',        // Often not needed and can be unstable
+        // '--single-process'     // Known to cause instability in persistent mode
+    ];
+    browserInstance = await puppeteer.launch({
+        headless: true,
+        defaultViewport: null,
+        args
+    });
+
+    browserInstance.on('disconnected', () => {
+        console.log('Puppeteer browser disconnected. It will be relaunched on next request.');
+        browserInstance = null;
+    });
+
+    return browserInstance;
+}
+// ---
+
 // Constants
-const FETCH_TIMEOUT = 60000 ; // 10 seconds timeout for page load
+const FETCH_TIMEOUT = 60000; // 60 seconds timeout for page load
 const RETRY_DELAY = 10000;   // 10 seconds delay between retries
 const MAX_RETRIES = 3;       // Maximum number of retries for failed requests
 const NEWS_CACHE_TTL = 600;  // TTL for news list pages: 10 minutes
@@ -48,6 +76,64 @@ const getNextProxy = () => {
   return PROXY_LIST[proxyIndex];
 };
 
+// A helper function to scroll the page slowly to trigger all lazy-loading
+async function autoScroll(page){
+    await page.evaluate(async () => {
+        await new Promise((resolve) => {
+            let totalHeight = 0;
+            const distance = 100;
+            const timer = setInterval(() => {
+                const scrollHeight = document.body.scrollHeight;
+                window.scrollBy(0, distance);
+                totalHeight += distance;
+
+                if (totalHeight >= scrollHeight - window.innerHeight) {
+                    clearInterval(timer);
+                    resolve();
+                }
+            }, 100);
+        });
+    });
+}
+
+/**
+ * Parses relative timestamps like "5 minutes ago" into Date objects.
+ * @param {string} timestamp - The string to parse.
+ * @returns {Date} - A Date object representing the absolute time.
+ */
+function parseTimestamp(timestamp) {
+    const now = new Date();
+    if (!timestamp) return now;
+
+    const lowerCaseTimestamp = timestamp.toLowerCase();
+
+    if (lowerCaseTimestamp.includes('just now')) {
+        return now;
+    }
+
+    const minutesMatch = lowerCaseTimestamp.match(/(\d+)\s*m(inute)?s?\s*ago/);
+    if (minutesMatch) {
+        now.setMinutes(now.getMinutes() - parseInt(minutesMatch[1], 10));
+        return now;
+    }
+
+    const hoursMatch = lowerCaseTimestamp.match(/(\d+)\s*h(our)?s?\s*ago/);
+    if (hoursMatch) {
+        now.setHours(now.getHours() - parseInt(hoursMatch[1], 10));
+        return now;
+    }
+
+    // Handle full date formats like "MMM DD, YYYY" or "YYYY-MM-DD"
+    // This is a simple attempt; a robust library might be better for more formats.
+    const date = new Date(timestamp);
+    if (!isNaN(date.getTime())) {
+        return date;
+    }
+
+    // Default to now if parsing fails, to avoid sorting errors
+    return now;
+}
+
 const CATEGORY_URLS = {
   latest: 'https://www.investing.com/news/latest-news',
   breakingNews: 'https://www.investing.com/news/headlines',
@@ -76,30 +162,29 @@ const CATEGORY_URLS = {
  * @returns {Promise<Object>} - Pseudo-response with a text() method.
  */
 async function fetchWithTimeout(url, retries = MAX_RETRIES) {
-  let browser = null;
-  // rotate proxies if configured
-  const proxyUrl = getNextProxy();
+  let page = null;
+  // Note: Proxy rotation is disabled when using a persistent browser instance
+  // as proxies must be set at browser launch.
+  // const proxyUrl = getNextProxy();
 
   try {
-    // 1) launch Chrome under root
-    const args = [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--single-process'
-    ];
-    if (proxyUrl) {
-      args.push(`--proxy-server=${proxyUrl}`);
-    }
-    browser = await puppeteer.launch({
-      headless: true,
-      defaultViewport: null,
-      args
-    });
+    // 1) Get the persistent browser instance
+    const browser = await getBrowser();
 
     // 2) open a page and set headers / user agent
-    const page = await browser.newPage();
+    page = await browser.newPage();
+
+    // --- Start: Request Interception to block non-essential resources ---
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+        if (['stylesheet', 'font'].includes(req.resourceType())) {
+            req.abort();
+        } else {
+            req.continue();
+        }
+    });
+    // --- End: Request Interception ---
+
     await page.setUserAgent(getRandomUserAgent());
     await page.setExtraHTTPHeaders({
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
@@ -120,6 +205,9 @@ async function fetchWithTimeout(url, retries = MAX_RETRIES) {
     await page.goto(url, { waitUntil: 'networkidle2', timeout: FETCH_TIMEOUT });
     console.log(`Page loaded: ${url}`);
 
+    // Scroll to bottom to trigger any lazy-loaded content
+    await autoScroll(page);
+
     // 5) dismiss any login popup
     await delay(500);
     const modal = await page.$('div[role="dialog"]');
@@ -134,12 +222,20 @@ async function fetchWithTimeout(url, retries = MAX_RETRIES) {
     // 6) grab the HTML and return
     const html = await page.content();
     console.log(`Fetched content length: ${html.length}`);
-    await browser.close();
+    await page.close(); // Close the page, not the browser
     return { text: async () => html };
   } catch (error) {
-    // ensure Chrome is closed on error
-    if (browser) await browser.close();
+    // ensure page is closed on error
+    if (page) await page.close().catch(e => console.error("Error closing page on failure:", e.message));
+
     console.error(`Error fetching ${url}:`, error.message);
+
+    // If the browser crashed, force a full restart on the next attempt
+    if (error.message.includes('Protocol error') && browserInstance) {
+        console.log('Browser has likely crashed. Attempting to close and nullify the instance.');
+        await browserInstance.close().catch(e => console.error("Error closing crashed browser instance:", e.message));
+        browserInstance = null;
+    }
 
     // retry logic
     if (retries > 0) {
@@ -165,48 +261,47 @@ async function scrapeGeneralNews(url, page = 1) {
   const cachedData = await getCache(cacheKey);
   if (cachedData) return cachedData;
 
-  try {
-    const fullUrl = `${url}/${page}`;
-    const response = await fetchWithTimeout(fullUrl);
-    const body = await response.text();
-    const $ = cheerio.load(body);
-    const newsItems = [];
+  const fullUrl = `${url}/${page}`;
+  const response = await fetchWithTimeout(fullUrl);
+  const body = await response.text();
+  const $ = cheerio.load(body);
+  const newsItems = [];
 
-    $('article[data-test="article-item"]').each((_, element) => {
-      const title = $(element).find('a[data-test="article-title-link"]').text().trim();
-      let articleUrl = $(element).find('a[data-test="article-title-link"]').attr('href');
-      if (articleUrl && !articleUrl.startsWith('http')) {
-        articleUrl = `https://www.investing.com${articleUrl}`;
-      }
-      const imageUrl = $(element).find('img[data-test="item-image"]').attr('src') || '';
-      const description = $(element).find('p[data-test="article-description"]').text().trim() || 'No description available';
-      const timestamp = $(element).find('time[data-test="article-publish-date"]').text().trim();
-      const author = $(element).find('span[data-test="news-provider-name"]').text().trim() || 'Unknown Author';
+  $('article[data-test="article-item"]').each((_, element) => {
+    const title = $(element).find('a[data-test="article-title-link"]').text().trim();
+    let articleUrl = $(element).find('a[data-test="article-title-link"]').attr('href');
+    if (articleUrl && !articleUrl.startsWith('http')) {
+      articleUrl = `https://www.investing.com${articleUrl}`;
+    }
+    const imageUrl = $(element).find('img[data-test="item-image"]').attr('src') || $(element).find('img').attr('src') || '';
+    const description = $(element).find('p[data-test="article-description"]').text().trim() || 'No description available';
+    const timestamp = $(element).find('time[data-test="article-publish-date"]').text().trim();
+    const author = $(element).find('span[data-test="news-provider-name"]').text().trim() || 'Unknown Author';
+    const publishDate = parseTimestamp(timestamp);
 
-      if (title && articleUrl) {
-        newsItems.push({ title, url: articleUrl, imageUrl, description, timestamp, author });
-      }
-    });
+    if (title && articleUrl) {
+      newsItems.push({ title, url: articleUrl, imageUrl, description, timestamp, author, publishDate: publishDate.toISOString() });
+    }
+  });
 
-    let totalPages = 1;
-    const paginationElement = $('.mb-4.flex.select-none.justify-between');
-    if (paginationElement.length) {
-      const lastPageLink = paginationElement.find('a').last().attr('href');
-      if (lastPageLink) {
-        const pageMatch = lastPageLink.match(/\/(\d+)$/);
-        if (pageMatch && pageMatch[1]) {
-          totalPages = parseInt(pageMatch[1], 10);
-        }
+  // Sort news items by publish date, newest first
+  newsItems.sort((a, b) => new Date(b.publishDate) - new Date(a.publishDate));
+
+  let totalPages = 1;
+  const paginationElement = $('.mb-4.flex.select-none.justify-between');
+  if (paginationElement.length) {
+    const lastPageLink = paginationElement.find('a').last().attr('href');
+    if (lastPageLink) {
+      const pageMatch = lastPageLink.match(/\/(\d+)$/);
+      if (pageMatch && pageMatch[1]) {
+        totalPages = parseInt(pageMatch[1], 10);
       }
     }
-
-    const result = { newsItems, totalPages };
-    await setCache(cacheKey, result, NEWS_CACHE_TTL);
-    return result;
-  } catch (error) {
-    console.error('Error scraping general news:', error.message);
-    return { newsItems: [], totalPages: 1 };
   }
+
+  const result = { newsItems, totalPages };
+  await setCache(cacheKey, result, NEWS_CACHE_TTL);
+  return result;
 }
 
 /**
@@ -222,89 +317,87 @@ export async function scrapeNewsDetails(url) {
   const cachedDetail = await getCache(cacheKey);
   if (cachedDetail) return cachedDetail;
 
-  try {
-    if (!url || url === 'No URL available') {
-      throw new Error('Invalid URL provided');
-    }
-    const response = await fetchWithTimeout(url);
-    const body = await response.text();
-    const $ = cheerio.load(body);
-
-    // Remove any residual login/sign-up modal markup
-    $('div[role="dialog"]').remove();
-    $('[data-test="sign-up-dialog"]').remove();
-
-    const articleImage = $('div.mb-5.mt-4.sm\\:mt-8.md\\:mb-8 img').attr('src') || '';
-    const contentElements = $('div.article_WYSIWYG__O0uhw').children();
-    let articleContent = '';
-
-    contentElements.each((_, element) => {
-      const tag = $(element).prop('tagName').toLowerCase();
-      const htmlContent = $(element).html();
-      if (tag === 'img' && $(element).attr('src') === articleImage) return; // Skip duplicate image
-      if (tag === 'h2') articleContent += `<h2>${htmlContent}</h2>`;
-      else if (tag === 'p') articleContent += `<p>${htmlContent}</p>`;
-      else if (tag === 'a')
-        articleContent += `<a href="${$(element).attr('href')}" class="text-blue-600 hover:underline">${htmlContent}</a>`;
-      else if (tag === 'strong') articleContent += `<strong>${htmlContent}</strong>`;
-      else articleContent += `<div>${htmlContent}</div>`;
-    });
-
-    const result = { content: articleContent || 'No detailed content available', articleImage };
-    await setCache(cacheKey, result, DETAIL_CACHE_TTL);
-    return result;
-  } catch (error) {
-    console.error(`Error scraping news details from ${url}:`, error);
-    return { content: 'No detailed content available', articleImage: '' };
+  if (!url || url === 'No URL available') {
+    throw new Error('Invalid URL provided');
   }
+  const response = await fetchWithTimeout(url);
+  const body = await response.text();
+  const $ = cheerio.load(body);
+
+  // Remove any residual login/sign-up modal markup
+  $('div[role="dialog"]').remove();
+  $('[data-test="sign-up-dialog"]').remove();
+
+  const articleWrapper = $('div.article_WYSIWYG__O0uhw');
+
+  // --- Start Content Cleanup ---
+  // 1. Remove specific ad text and "ProPicks" promotions
+  articleWrapper.find('p:contains("3rd party Ad.")').remove();
+  articleWrapper.find('a:contains("Unlock ProPicks AI")').closest('p').remove();
+  articleWrapper.find('p:contains("remove ads")').remove();
+
+  // 2. Remove empty paragraphs to clean up whitespace
+  articleWrapper.find('p').each((_, el) => {
+    if ($(el).text().trim() === '' && $(el).find('img').length === 0) {
+      $(el).remove();
+    }
+  });
+  // --- End Content Cleanup ---
+
+  const articleImage = $('div.mb-5.mt-4.sm\\:mt-8.md\\:mb-8 img').attr('src') || '';
+  const articleContent = articleWrapper.html(); // Get the cleaned HTML
+
+  const result = { content: articleContent || 'No detailed content available', articleImage };
+  await setCache(cacheKey, result, DETAIL_CACHE_TTL);
+  return result;
 }
 export async function scrapeBreakingNews(page = 1) {
   const url = `${CATEGORY_URLS.breakingNews}/${page}`;
-  try {
-    const response = await fetchWithTimeout(url);
-    const body = await response.text();
-    const $ = cheerio.load(body);
-    const newsItems = [];
+  const response = await fetchWithTimeout(url);
+  const body = await response.text();
+  const $ = cheerio.load(body);
+  const newsItems = [];
 
-    $('div.border-b').each((_, element) => {
-      const title = $(element).find('a.text-sm.font-semibold').text().trim();
-      let articleUrl = $(element).find('a.text-sm.font-semibold').attr('href');
-      if (articleUrl && !articleUrl.startsWith('http')) {
-        articleUrl = `https://www.investing.com${articleUrl}`;
-      }
+  $('div.border-b').each((_, element) => {
+    const title = $(element).find('a.text-sm.font-semibold').text().trim();
+    let articleUrl = $(element).find('a.text-sm.font-semibold').attr('href');
+    if (articleUrl && !articleUrl.startsWith('http')) {
+      articleUrl = `https://www.investing.com${articleUrl}`;
+    }
 
-      const timestamp = $(element).find('time').text().trim();
-      const author = $(element).find('span[title]').text().trim() || 'Unknown Author';
+    const timestamp = $(element).find('time').text().trim();
+    const author = $(element).find('span[title]').text().trim() || 'Unknown Author';
+    const publishDate = parseTimestamp(timestamp);
 
-      const stockData = [];
-      $(element).find('.news-headlines-list-item_related-pairs__A0Hws div').each((_, stockElement) => {
-        const stockName = $(stockElement).find('a span').first().text().trim();
-        const stockChange = $(stockElement).find('span.flex-none').text().trim();
-        const stockColor = $(stockElement).find('span').hasClass('text-positive-main') ? 'green' : 'red';
+    const stockData = [];
+    $(element).find('.news-headlines-list-item_related-pairs__A0Hws div').each((_, stockElement) => {
+      const stockName = $(stockElement).find('a span').first().text().trim();
+      const stockChange = $(stockElement).find('span.flex-none').text().trim();
+      const stockColor = $(stockElement).find('span').hasClass('text-positive-main') ? 'green' : 'red';
 
-        if (stockName && stockChange) {
-          stockData.push({ stockName, stockChange, stockColor });
-        }
-      });
-
-      const imageUrl = $(element).find('img').first().attr('src') || '';
-      if (title && articleUrl) {
-        newsItems.push({
-          title,
-          url: articleUrl,
-          imageUrl,
-          timestamp,
-          author,
-          stockData,
-        });
+      if (stockName && stockChange) {
+        stockData.push({ stockName, stockChange, stockColor });
       }
     });
 
-    return { newsItems, totalPages: 1 }; // No pagination for breaking news
-  } catch (error) {
-    console.error('Error scraping Breaking News:', error);
-    return { newsItems: [], totalPages: 1 };
-  }
+    const imageUrl = $(element).find('img').first().attr('src') || '';
+    if (title && articleUrl) {
+      newsItems.push({
+        title,
+        url: articleUrl,
+        imageUrl,
+        timestamp,
+        author,
+        stockData,
+        publishDate: publishDate.toISOString()
+      });
+    }
+  });
+
+  // Sort news items by publish date, newest first
+  newsItems.sort((a, b) => new Date(b.publishDate) - new Date(a.publishDate));
+
+  return { newsItems, totalPages: 1 }; // No pagination for breaking news
 }
 // Export category-specific functions
 export const scrapeLatestNews = (page = 1) => scrapeGeneralNews(CATEGORY_URLS.latest, page);

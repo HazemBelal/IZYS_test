@@ -38,7 +38,7 @@ const CATEGORIES = [
 ];
 
 // Widget definitions per category (preserved from your logic)
-const getWidgetDefinitions = (symbol: string, category: string, underlyingSymbol?: string) => {
+const getWidgetDefinitions = (symbol: string, category: string) => {
   if (!symbol) return [];
   switch (category) {
     case "stocks":
@@ -693,124 +693,118 @@ const WidgetGallery: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
   }, [category, page, hasMore, loadingMore, search.length, deduplicateSymbols]);
 
   useEffect(() => {
-    const ref = listRef.current;
-    if (!ref) return;
-    ref.addEventListener('scroll', handleScroll);
-    return () => { 
-      ref.removeEventListener('scroll', handleScroll);
-      // Cleanup timeout on unmount
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
 
-  const widgets = selectedSymbol ? getWidgetDefinitions(selectedSymbol.symbol, category, selectedSymbol.underlying) : [];
+  const widgets = selectedSymbol ? getWidgetDefinitions(selectedSymbol.symbol, category) : [];
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>Browse Markets & Add Widgets</DialogTitle>
-      <DialogContent>
-        <Tabs value={category} onChange={(_, v) => setCategory(v)} sx={{ mb: 2 }}>
-          {CATEGORIES.map((cat) => (
-            <Tab key={cat.value} label={cat.label} value={cat.value} />
-          ))}
-        </Tabs>
-        <Box sx={{ display: 'flex', gap: 3 }}>
-          <Box sx={{ flex: 1 }}>
+    <div className="bg-gray-900 text-white min-h-screen p-4 sm:p-6 md:p-8">
+      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+        <DialogTitle>Browse Markets & Add Widgets</DialogTitle>
+        <DialogContent>
+          <Tabs value={category} onChange={(_, v) => setCategory(v)} sx={{ mb: 2 }}>
+            {CATEGORIES.map((cat) => (
+              <Tab key={cat.value} label={cat.label} value={cat.value} />
+            ))}
+          </Tabs>
+          <Box sx={{ display: 'flex', gap: 3 }}>
+            <Box sx={{ flex: 1 }}>
 
-            <TextField
-              label="Search symbols"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              fullWidth
-              sx={{ mb: 2 }}
-            />
-            <List ref={listRef} sx={{ maxHeight: 300, overflow: 'auto', border: '1px solid #eee', borderRadius: 1 }}>
-              {loading ? (
-                <ListItem><ListItemText primary="Loading..." /></ListItem>
-              ) : symbols.length === 0 ? (
-                <ListItem><ListItemText primary="No symbols found" /></ListItem>
-              ) : (
-                symbols.map((sym) => (
-                  <ListItem key={sym.id} disablePadding>
-                    <ListItemButton
-                      selected={selectedSymbol?.id === sym.id}
-                      onClick={() => setSelectedSymbol(sym)}
-                    >
-                      <ListItemText
-                        primary={sym.symbol}
-                        secondary={sym.description || sym.name}
-                        secondaryTypographyProps={{ sx: { whiteSpace: 'pre-line', wordBreak: 'break-word' } }}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                ))
-              )}
-              {hasMore && !loading && (
-                <ListItem sx={{ justifyContent: 'center' }}>
-                  <CircularProgress size={24} />
-                </ListItem>
-              )}
-            </List>
-          </Box>
-          <Box sx={{ flex: 2 }}>
-            {selectedSymbol ? (
-              <>
-                <Typography variant="h6" gutterBottom>
-                  {selectedSymbol.symbol} - {selectedSymbol.name}
-                </Typography>
-                <List>
-                  {widgets.map((w) => (
-                    <ListItem key={w.id} sx={{ alignItems: 'flex-start' }}>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="subtitle1">{w.name}</Typography>
-                        <Typography variant="body2" color="text.secondary">Widget: {w.id}</Typography>
-                      </Box>
-                      <Button
-                        variant="contained"
-                        onClick={async () => {
-                          // Validate that a symbol is selected
-                          if (!selectedSymbol || !selectedSymbol.symbol || typeof selectedSymbol.symbol !== 'string' || !selectedSymbol.symbol.trim()) {
-                            alert('Please select a valid symbol before adding this widget.');
-                            return;
-                          }
-                          // Log config for debugging
-                          console.log('Adding widget with config:', w.config);
-                          // Find a non-overlapping position
-                          const offset = 40 * widgets.length;
-                          const newPosition = {
-                            ...w.default,
-                            x: w.default.x + offset,
-                            y: w.default.y + offset,
-                          };
-                          await addWidget({
-                            symbol: selectedSymbol.symbol,
-                            category,
-                            widget_type: w.id,
-                            name: w.name,
-                            position: newPosition,
-                            config: w.config,
-                            script_src: w.script_src,
-                          });
-                          onClose();
-                        }}
+              <TextField
+                label="Search symbols"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                fullWidth
+                sx={{ mb: 2 }}
+              />
+              <List ref={listRef} sx={{ maxHeight: 300, overflow: 'auto', border: '1px solid #eee', borderRadius: 1 }}>
+                {loading ? (
+                  <ListItem><ListItemText primary="Loading..." /></ListItem>
+                ) : symbols.length === 0 ? (
+                  <ListItem><ListItemText primary="No symbols found" /></ListItem>
+                ) : (
+                  symbols.map((sym) => (
+                    <ListItem key={sym.id} disablePadding>
+                      <ListItemButton
+                        selected={selectedSymbol?.id === sym.id}
+                        onClick={() => setSelectedSymbol(sym)}
                       >
-                        Add to Dashboard
-                      </Button>
+                        <ListItemText
+                          primary={sym.symbol}
+                          secondary={sym.description || sym.name}
+                          secondaryTypographyProps={{ sx: { whiteSpace: 'pre-line', wordBreak: 'break-word' } }}
+                        />
+                      </ListItemButton>
                     </ListItem>
-                  ))}
-                </List>
-              </>
-            ) : (
-              <Typography variant="body2" color="text.secondary">
-                Select a symbol to see available widgets.
-              </Typography>
-            )}
+                  ))
+                )}
+                {hasMore && !loading && (
+                  <ListItem sx={{ justifyContent: 'center' }}>
+                    <CircularProgress size={24} />
+                  </ListItem>
+                )}
+              </List>
+            </Box>
+            <Box sx={{ flex: 2 }}>
+              {selectedSymbol ? (
+                <>
+                  <Typography variant="h6" gutterBottom>
+                    {selectedSymbol.symbol} - {selectedSymbol.name}
+                  </Typography>
+                  <List>
+                    {widgets.map((w) => (
+                      <ListItem key={w.id} sx={{ alignItems: 'flex-start' }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="subtitle1">{w.name}</Typography>
+                          <Typography variant="body2" color="text.secondary">Widget: {w.id}</Typography>
+                        </Box>
+                        <Button
+                          variant="contained"
+                          onClick={async () => {
+                            // Validate that a symbol is selected
+                            if (!selectedSymbol || !selectedSymbol.symbol || typeof selectedSymbol.symbol !== 'string' || !selectedSymbol.symbol.trim()) {
+                              alert('Please select a valid symbol before adding this widget.');
+                              return;
+                            }
+                            // Log config for debugging
+                            console.log('Adding widget with config:', w.config);
+                            // Find a non-overlapping position
+                            const offset = 40 * widgets.length;
+                            const newPosition = {
+                              ...w.default,
+                              x: w.default.x + offset,
+                              y: w.default.y + offset,
+                            };
+                            await addWidget({
+                              symbol: selectedSymbol.symbol,
+                              category,
+                              widget_type: w.id,
+                              name: w.name,
+                              position: newPosition,
+                              config: w.config,
+                              script_src: w.script_src,
+                            });
+                            onClose();
+                          }}
+                        >
+                          Add to Dashboard
+                        </Button>
+                      </ListItem>
+                    ))}
+                  </List>
+                </>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  Select a symbol to see available widgets.
+                </Typography>
+              )}
+            </Box>
           </Box>
-        </Box>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };
 

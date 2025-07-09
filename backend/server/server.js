@@ -580,7 +580,7 @@ app.get('/api/calendar', async (req, res) => {
 // ==========================================================
 // Background News Refresh (Every 30 Minutes)
 // ==========================================================
-const MAX_PAGES = 5;  // Increase this value to scrape more pages per category
+const MAX_PAGES = 10;  // Increase this value to scrape more pages per category
 const refreshCategories = [
   { name: 'latest', fn: scrapeLatestNews },
   { name: 'breaking-news', fn: scrapeBreakingNews },
