@@ -29,6 +29,7 @@ import {
 
 import { scrapeForexFactoryRange } from '../scraper/calendarScraper.js';
 import { scrapeGraphData } from '../scraper/graphScraper.js';
+import { warmGraphCache } from '../scraper/cacheWarmer.js';
 import symbolScraperModule from '../scraper/SymbolsScraper.js';
 
 
@@ -609,6 +610,15 @@ cron.schedule('*/30 * * * *', async () => {
   console.log(`Scheduled news refresh completed at ${new Date()}`);
 });
 
+// Background Graph Cache Warmer (Every Hour at the 15-minute mark)
+cron.schedule('15 * * * *', () => {
+  console.log(`📅 Starting scheduled graph cache warming at ${new Date()}`);
+  // This runs in the background without being awaited
+  warmGraphCache(redisClient).catch(err => {
+    console.error("A critical unhandled error occurred in the hourly warmGraphCache job:", err);
+  });
+});
+
 // Weekly cron job to refresh symbols every Sunday at midnight
 cron.schedule('0 0 * * 0', async () => {
   console.log('Starting weekly symbol refresh...');
@@ -690,6 +700,12 @@ async function startServer() {
 - http://localhost:${PORT}
 - http://127.0.0.1:${PORT}
 - Your local IP: http://${getLocalIp()}:${PORT}`);
+    });
+
+    // Initial cache warming on startup, runs in the background
+    console.log('🚀 Triggering initial graph cache warming on server start...');
+    warmGraphCache(redisClient).catch(err => {
+        console.error("A critical unhandled error occurred during initial cache warm-up:", err);
     });
 
     return server;

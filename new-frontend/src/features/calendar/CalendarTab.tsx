@@ -313,16 +313,36 @@ const CalendarTab: React.FC = () => {
   }, [allCurrencies, isCurrenciesInitialized]);
 
   // Timezone selector state
-  const [selectedTimezone, setSelectedTimezone] = useState(
-    localStorage.getItem('calendarTimezone') || Intl.DateTimeFormat().resolvedOptions().timeZone
-  );
+  const [selectedTimezone, setSelectedTimezone] = useState<string>(() => {
+    // Try to get from localStorage first
+    const saved = localStorage.getItem('calendar_timezone');
+    if (saved) return saved;
+    // Otherwise, use browser's timezone if available in your list
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    console.log('Detected browser timezone:', browserTz);
+    // Try to find a direct match
+    let found = FOREX_FACTORY_TIMEZONES.find(tz => tz.value === browserTz);
+    if (found) {
+      console.log('Matched timezone from list:', browserTz);
+      return browserTz;
+    }
+    // Try to find a match by city name (for some browser timezones)
+    const browserCity = browserTz.split('/').pop();
+    found = FOREX_FACTORY_TIMEZONES.find(tz => tz.value.split('/').pop() === browserCity);
+    if (found) {
+      console.log('Matched timezone by city from list:', found.value);
+      return found.value;
+    }
+    // fallback to UTC
+    console.log('No match found, falling back to UTC');
+    return 'Etc/UTC';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('calendar_timezone', selectedTimezone);
+  }, [selectedTimezone]);
 
   const localToday = DateTime.now().setZone(selectedTimezone);
-
-  // Persist timezone selection
-  useEffect(() => {
-    localStorage.setItem('calendarTimezone', selectedTimezone);
-  }, [selectedTimezone]);
 
   // Fetch economic calendar data
   const fetchCalendarData = async (timeframe: string) => {
