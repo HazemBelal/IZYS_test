@@ -1,6 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Chart } from 'react-chartjs-2';
-import type { ChartData, ChartOptions, ChartDataset } from 'chart.js';
+import { useEffect, useRef, useState } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -11,7 +9,11 @@ import {
   Title,
   Tooltip,
   Legend,
+  BarController,
+  LineController,
 } from 'chart.js';
+import { Chart } from 'react-chartjs-2';
+import type { ChartData, ChartOptions, ChartDataset } from 'chart.js';
 import zoomPlugin from 'chartjs-plugin-zoom';
 import { Box, CircularProgress, Typography, Button, ButtonGroup, Switch, FormControlLabel } from '@mui/material';
 import { DateTime } from 'luxon';
@@ -26,7 +28,9 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  zoomPlugin
+  zoomPlugin,
+  BarController,
+  LineController
 );
 
 interface RawGraphDataPoint {

@@ -1,52 +1,65 @@
 // loginAndCaptureCookies.js
 import puppeteer from 'puppeteer';
-import fs           from 'fs';
+import fs from 'fs/promises';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
-// re-use your delay helper
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-(async () => {
+const TRADINGVIEW_COOKIES_PATH = path.join(__dirname, 'tradingview-cookies.json');
+const TRADINGVIEW_LOGIN_URL = 'https://www.tradingview.com/#signin';
+
+/**
+ * Launches a browser for the user to log in to TradingView,
+ * then captures and saves the session cookies.
+ */
+async function loginAndCaptureCookies() {
+  console.log('🚀 Launching browser for TradingView login...');
+  
   const browser = await puppeteer.launch({
-    headless: false,
-    defaultViewport: null,
-    args: ['--no-sandbox','--disable-setuid-sandbox']
+    headless: false, // Must be false to allow for manual login
+    defaultViewport: { width: 1280, height: 800 },
+    args: ['--window-size=1280,800'],
   });
+
   const page = await browser.newPage();
+  
+  console.log(`Please log in to TradingView in the browser window...`);
+  await page.goto(TRADINGVIEW_LOGIN_URL, { waitUntil: 'networkidle2' });
 
-  // 1) Go to Investing.com
-  await page.goto('https://www.investing.com', {
-    waitUntil: 'networkidle2',
-    timeout: 60000
-  });
-
-  // 2) Dismiss GDPR/consent banner
+  // Wait for the user to navigate away from the login page, indicating success
+  console.log('Waiting for successful login (navigation away from sign-in page)...');
   try {
-    await page.waitForSelector('#onetrust-accept-btn-handler', { timeout: 5000 });
-    await page.click('#onetrust-accept-btn-handler');
-    console.log('✔️ Closed consent banner');
-  } catch {
-    console.log('ℹ️  No consent banner found');
+    await page.waitForNavigation({ timeout: 300000 }); // 5-minute timeout
+  } catch (error) {
+    console.error('Login timeout. You must complete the login within 5 minutes.');
+    await browser.close();
+    return;
   }
-
-  // 3) Dismiss newsletter pop-up
-  try {
-    await page.waitForSelector('.newsletterPopUp .popupCloseIcon', { timeout: 5000 });
-    await page.click('.newsletterPopUp .popupCloseIcon');
-    console.log('✔️ Closed newsletter pop-up');
-  } catch {
-    console.log('ℹ️  No newsletter pop-up found');
-  }
-
-  // 4) Wait 2 seconds for any page JS to settle
-  await delay(2000);
-
-  // 5) Capture cookies
+  
+  console.log('✅ Login successful! Adding a 5-second delay to ensure all cookies are set...');
+  await new Promise(resolve => setTimeout(resolve, 5000)); // 5-second hard delay
+  
+  console.log('Capturing cookies...');
+  
   const cookies = await page.cookies();
-  fs.writeFileSync(
-    'investing-cookies.json',
-    JSON.stringify(cookies, null, 2)
-  );
-  console.log(`💾 Saved ${cookies.length} cookies to investing-cookies.json`);
+  
+  // Save all cookies for the tradingview.com domain
+  const tradingViewCookies = cookies.filter(cookie => cookie.domain.includes('tradingview.com'));
+
+  if (tradingViewCookies.length < 3) { // A basic check
+      console.warn('⚠️ Found fewer than 3 cookies for TradingView. The session might not be fully authenticated.');
+      console.log('Found cookies:', tradingViewCookies.map(c => c.name));
+  }
+  
+  await fs.writeFile(TRADINGVIEW_COOKIES_PATH, JSON.stringify(tradingViewCookies, null, 2));
+  console.log(`🍪 Successfully saved ${tradingViewCookies.length} cookies to ${TRADINGVIEW_COOKIES_PATH}`);
+
 
   await browser.close();
-})();
+}
+
+loginAndCaptureCookies().catch(err => {
+  console.error('An error occurred during the cookie capture process:', err);
+});

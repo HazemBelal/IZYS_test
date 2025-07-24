@@ -546,7 +546,6 @@ const WidgetGallery: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const listRef = useRef<HTMLUListElement>(null);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { addWidget } = useDashboard();
   
 
@@ -555,10 +554,11 @@ const WidgetGallery: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
   const deduplicateSymbols = (symbolsArray: any[]): any[] => {
     const seen = new Set();
     return symbolsArray.filter(sym => {
-      if (seen.has(sym.id)) {
+      const id = sym.id || sym.symbol;
+      if (seen.has(id)) {
         return false;
       }
-      seen.add(sym.id);
+      seen.add(id);
       return true;
     });
   };
@@ -570,131 +570,101 @@ const WidgetGallery: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
     setSearch('');
     setPage(1);
     setHasMore(true);
-    
-
   }, [category]);
 
-  // Fetch symbols (paginated)
+  // Fetch symbols (initial load)
   useEffect(() => {
     let ignore = false;
-    const fetchSymbols = async () => {
+    const fetchInitialSymbols = async () => {
+      if (!category) return;
       setLoading(true);
       try {
-        if (['etfs', 'futures', 'bonds'].includes(category)) {
-          // Use database-based endpoints for these categories
-          const response = await symbolsApi.getPaginatedData(category, 1, 20);
-          if (!ignore) {
-            const dataArray = response[category] || [];
-            setSymbols(dataArray.map((item: any, idx: number) => ({
-              id: item.id || item.symbol || idx,
-              symbol: item.symbol,
-              name: item.name,
-              description: item.description || item.name,
-              exchange: item.exchange,
-              category: category,
-            })));
-            setHasMore(response.page < response.totalPages);
-            setPage(1);
-          }
-        } else if (debouncedSearch.length > 1) {
+        let response;
+        if (debouncedSearch.length > 1) {
           const results = await symbolsApi.searchSymbols(category, debouncedSearch);
           if (!ignore) {
             setSymbols(deduplicateSymbols(results));
-            setHasMore(false);
+            setHasMore(false); // No pagination for search results
+          }
+          return;
+        }
+
+        if (['etfs', 'futures', 'bonds'].includes(category)) {
+          response = await symbolsApi.getPaginatedData(category, 1, 30);
+          if (!ignore) {
+            const dataArray = response[category] || [];
+            setSymbols(dataArray.map((item: any) => ({
+              ...item,
+              id: item.id || item.symbol,
+            })));
+            setHasMore(response.page < response.totalPages);
+            setPage(2); // Start from page 2 for next load
           }
         } else {
-          const { symbols: newSymbols, hasMore } = await symbolsApi.getPaginatedSymbols(category, 1);
+          response = await symbolsApi.getPaginatedSymbols(category, 1, 50);
           if (!ignore) {
-            setSymbols(deduplicateSymbols(newSymbols));
-            setHasMore(hasMore);
+            setSymbols(deduplicateSymbols(response.symbols));
+            setHasMore(response.hasMore);
+            setPage(2); // Start from page 2 for next load
           }
         }
+      } catch (error) {
+        console.error(`Error fetching initial symbols for ${category}:`, error);
+        if (!ignore) {
+          setSymbols([]);
+          setHasMore(false);
+        }
       } finally {
-        setLoading(false);
+        if (!ignore) {
+          setLoading(false);
+        }
       }
     };
-    fetchSymbols();
+    fetchInitialSymbols();
     return () => { ignore = true; };
   }, [category, debouncedSearch]);
 
-  // Infinite scroll handler with debouncing
-  const handleScroll = useCallback(() => {
-    if (!listRef.current || loadingMore || !hasMore || search.length > 1) return;
-    
-    const { scrollTop, scrollHeight, clientHeight } = listRef.current;
-    if (scrollHeight - scrollTop - clientHeight < 40) {
-      // Clear any existing timeout
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-      
-      // Debounce the API call
-      scrollTimeoutRef.current = setTimeout(() => {
-        setLoadingMore(true);
-        
+  // Infinite scroll handler
+  const handleScroll = useCallback(async () => {
+    if (loadingMore || !hasMore || debouncedSearch.length > 1) return;
+
+    if (listRef.current && listRef.current.scrollHeight - listRef.current.scrollTop - listRef.current.clientHeight < 200) {
+      setLoadingMore(true);
+      try {
+        let newData;
         if (['etfs', 'futures', 'bonds'].includes(category)) {
-          // Handle database-based category pagination
-          symbolsApi.getPaginatedData(category, page + 1, 20)
-            .then((response) => {
-              const dataArray = response[category] || [];
-              if (dataArray && dataArray.length > 0) {
-                setSymbols((prev) => {
-                  // Combine existing and new symbols, then deduplicate
-                  const newSymbols = dataArray.map((item: any, idx: number) => ({
-                    id: item.id || item.symbol || `${page + 1}-${idx}`,
-                    symbol: item.symbol,
-                    name: item.name,
-                    description: item.description || item.name,
-                    exchange: item.exchange,
-                    category: category,
-                  }));
-                  const combined = [...prev, ...newSymbols];
-                  return deduplicateSymbols(combined);
-                });
-                setPage((p) => p + 1);
-                setHasMore(response.page < response.totalPages);
-              } else {
-                setHasMore(false);
-              }
-            })
-            .catch((error: any) => {
-              console.error(`Error loading more ${category}:`, error);
-              setHasMore(false);
-            })
-            .finally(() => {
-              setLoadingMore(false);
-            });
+          const response = await symbolsApi.getPaginatedData(category, page, 30);
+          const dataArray = response[category] || [];
+          newData = {
+            symbols: dataArray.map((item: any) => ({ ...item, id: item.id || item.symbol })),
+            hasMore: response.page < response.totalPages
+          };
         } else {
-          // Handle other categories
-        symbolsApi.getPaginatedSymbols(category, page + 1)
-          .then(({ symbols: more, hasMore: moreHasMore }: { symbols: any[], hasMore: boolean }) => {
-            if (more && more.length > 0) {
-              setSymbols((prev) => {
-                // Combine existing and new symbols, then deduplicate
-                const combined = [...prev, ...more];
-                return deduplicateSymbols(combined);
-              });
-              setPage((p) => p + 1);
-              setHasMore(moreHasMore);
-            } else {
-              setHasMore(false);
-            }
-          })
-          .catch((error: any) => {
-            console.error('Error loading more symbols:', error);
-            setHasMore(false);
-          })
-          .finally(() => {
-            setLoadingMore(false);
-          });
+          newData = await symbolsApi.getPaginatedSymbols(category, page, 50);
         }
-      }, 150); // 150ms debounce
+
+        if (newData.symbols.length > 0) {
+          setSymbols(prev => deduplicateSymbols([...prev, ...newData.symbols]));
+          setPage(prev => prev + 1);
+        }
+        setHasMore(newData.hasMore);
+
+      } catch (error) {
+        console.error(`Error loading more ${category}:`, error);
+        setHasMore(false);
+      } finally {
+        setLoadingMore(false);
+      }
     }
-  }, [category, page, hasMore, loadingMore, search.length, deduplicateSymbols]);
+  }, [category, page, hasMore, loadingMore, debouncedSearch]);
+
 
   useEffect(() => {
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    const listElement = listRef.current;
+    if (listElement) {
+      listElement.addEventListener('scroll', handleScroll);
+      return () => listElement.removeEventListener('scroll', handleScroll);
+    }
   }, [handleScroll]);
 
   const widgets = selectedSymbol ? getWidgetDefinitions(selectedSymbol.symbol, category) : [];
@@ -719,16 +689,24 @@ const WidgetGallery: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
                 fullWidth
                 sx={{ mb: 2 }}
               />
-              <List ref={listRef} sx={{ maxHeight: 300, overflow: 'auto', border: '1px solid #eee', borderRadius: 1 }}>
-                {loading ? (
+              <List
+                ref={listRef}
+                sx={{
+                  maxHeight: 300,
+                  overflow: 'auto',
+                  border: '1px solid #eee',
+                  borderRadius: 1,
+                }}
+              >
+                {loading && symbols.length === 0 ? (
                   <ListItem><ListItemText primary="Loading..." /></ListItem>
                 ) : symbols.length === 0 ? (
                   <ListItem><ListItemText primary="No symbols found" /></ListItem>
                 ) : (
                   symbols.map((sym) => (
-                    <ListItem key={sym.id} disablePadding>
+                    <ListItem key={sym.id || sym.symbol} disablePadding>
                       <ListItemButton
-                        selected={selectedSymbol?.id === sym.id}
+                        selected={selectedSymbol?.id === (sym.id || sym.symbol)}
                         onClick={() => setSelectedSymbol(sym)}
                       >
                         <ListItemText
@@ -763,16 +741,12 @@ const WidgetGallery: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
                         <Button
                           variant="contained"
                           onClick={async () => {
-                            // Validate that a symbol is selected
-                            if (!selectedSymbol || !selectedSymbol.symbol || typeof selectedSymbol.symbol !== 'string' || !selectedSymbol.symbol.trim()) {
-                              alert('Please select a valid symbol before adding this widget.');
+                            if (!selectedSymbol?.symbol) {
+                              alert('Please select a valid symbol.');
                               return;
                             }
-                            // Log config for debugging
-                            console.log('Adding widget with config:', w.config);
-                            // Find a non-overlapping position
                             const offset = 40 * widgets.length;
-                            const newPosition = {
+                            const newPosition = { 
                               ...w.default,
                               x: w.default.x + offset,
                               y: w.default.y + offset,

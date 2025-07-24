@@ -13,20 +13,9 @@ import net from 'net';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 import {
-  scrapeLatestNews,
-  scrapeBreakingNews,
-  scrapeCryptoNews,
-  scrapeStockMarketNews,
-  scrapeCommoditiesNews,
-  scrapeCurrenciesNews,
-  scrapeEconomyNews,
-  scrapeEconomicIndicatorsNews,
-  scrapePoliticsNews,
-  scrapeWorldNews,
-  scrapeCompanyNews,
-  scrapeNewsDetails,
-} from '../scraper/newsScraper.js';
-
+  getNewsList,
+  getNewsDetail
+} from '../scraper/tradingViewNewsScraper.js';
 import { scrapeForexFactoryRange } from '../scraper/calendarScraper.js';
 import { scrapeGraphData } from '../scraper/graphScraper.js';
 import { warmGraphCache } from '../scraper/cacheWarmer.js';
@@ -473,9 +462,15 @@ app.get('/api/symbols/stream', async (req, res) => {
     const [initialSymbols] = await dbPool.query('SELECT * FROM financial_symbols WHERE category = ? LIMIT 100', [category]);
     res.write(`data: ${JSON.stringify(initialSymbols)}\n\n`);
     const updateInterval = setInterval(async () => {
-      const [newSymbols] = await dbPool.query('SELECT * FROM financial_symbols WHERE category = ? ORDER BY RAND() LIMIT 5', [category]);
-      if (newSymbols.length) res.write(`data: ${JSON.stringify(newSymbols)}\n\n`);
-    }, 5000);
+      // More efficient way to get random rows than ORDER BY RAND()
+      const [countResult] = await dbPool.query('SELECT COUNT(*) as count FROM financial_symbols WHERE category = ?', [category]);
+      const total = countResult[0].count;
+      const offset = Math.floor(Math.random() * (total - 5)); // ensure we can select 5
+      if (total > 0) {
+        const [newSymbols] = await dbPool.query('SELECT * FROM financial_symbols WHERE category = ? LIMIT 5 OFFSET ?', [category, offset < 0 ? 0 : offset]);
+        if (newSymbols.length) res.write(`data: ${JSON.stringify(newSymbols)}\n\n`);
+      }
+    }, 15000); // Increased interval to 15 seconds
     req.on('close', () => { clearInterval(updateInterval); res.end(); });
   } catch (err) {
     console.error('SSE error:', err);
@@ -518,45 +513,39 @@ app.post('/api/register', async (req, res) => {
 // ==========================================================
 // NEWS & CALENDAR Endpoints (Scraping Integration)
 // ==========================================================
+
+// This endpoint now fetches news from the TradingView API
 app.get('/api/news', async (req, res) => {
-  const category = req.query.category || 'latest'; // Default category is 'latest'
-  const page = parseInt(req.query.page) || 1; // Default page number is 1
-  if (page < 1 || isNaN(page)) return res.status(400).json({ error: 'Invalid page number.' });
-  const categoryToScraper = {
-    latest: scrapeLatestNews,
-    'breaking-news': scrapeBreakingNews,
-    cryptocurrency: scrapeCryptoNews,
-    'stock-markets': scrapeStockMarketNews,
-    commodities: scrapeCommoditiesNews,
-    currencies: scrapeCurrenciesNews,
-    economy: scrapeEconomyNews,
-    'economic-indicators': scrapeEconomicIndicatorsNews,
-    politics: scrapePoliticsNews,
-    world: scrapeWorldNews,
-    'company-news': scrapeCompanyNews,
-  };
-  const scraper = categoryToScraper[category];
-  if (!scraper) return res.status(400).json({ error: 'Invalid category provided.' });
   try {
-    const { newsItems, totalPages } = await scraper(page);
-    if (newsItems.length === 0)
-      return res.status(404).json({ message: `No news found for category: ${category} on page: ${page}` });
-    res.status(200).json({ newsItems, totalPages });
+    console.log('--- Received /api/news request ---');
+    console.log('Query Params:', JSON.stringify(req.query, null, 2));
+
+    // markets should be a comma-separated string, e.g., "stock,crypto"
+    const markets = req.query.markets ? req.query.markets.split(',') : [];
+    const countries = req.query.market_country ? req.query.market_country.split(',') : [];
+
+    console.log(`Parsed Markets: [${markets.join(', ')}]`);
+    console.log(`Parsed Countries: [${countries.join(', ')}]`);
+
+    const newsData = await getNewsList(markets, countries);
+    res.status(200).json(newsData);
   } catch (error) {
-    console.error(`Error fetching news for category: ${category}, page: ${page}`, error);
-    res.status(500).json({ error: `Error fetching news for category: ${category}. Please try again later.` });
+    console.error('Error fetching TradingView news list:', error.message);
+    res.status(500).json({ error: 'Failed to fetch news from TradingView API', details: error.message });
   }
 });
 
+
 // GET /api/news/detail - Scrape detailed content for a specific news item
+// This endpoint now fetches news details from the TradingView API by story ID
 app.get('/api/news/detail', async (req, res) => {
-  const { url } = req.query;
-  if (!url) return res.status(400).json({ error: 'No URL provided for news detail.' });
+  const { storyId } = req.query;
+  if (!storyId) return res.status(400).json({ error: 'No storyId provided for news detail.' });
   try {
-    const newsDetails = await scrapeNewsDetails(decodeURIComponent(url));
+    const newsDetails = await getNewsDetail(storyId);
     res.status(200).json(newsDetails);
   } catch (error) {
-    console.error(`Error fetching news details for URL: ${url}`, error);
+    console.error(`Error fetching news details for storyId: ${storyId}`, error);
     res.status(500).json({ error: 'Error fetching news details. Please try again later.' });
   }
 });
@@ -580,35 +569,9 @@ app.get('/api/calendar', async (req, res) => {
 // ==========================================================
 // Background News Refresh (Every 30 Minutes)
 // ==========================================================
-const MAX_PAGES = 10;  // Increase this value to scrape more pages per category
-const refreshCategories = [
-  { name: 'latest', fn: scrapeLatestNews },
-  { name: 'breaking-news', fn: scrapeBreakingNews },
-  { name: 'cryptocurrency', fn: scrapeCryptoNews },
-  { name: 'stock-markets', fn: scrapeStockMarketNews },
-  { name: 'commodities', fn: scrapeCommoditiesNews },
-  { name: 'currencies', fn: scrapeCurrenciesNews },
-  { name: 'economy', fn: scrapeEconomyNews },
-  { name: 'economic-indicators', fn: scrapeEconomicIndicatorsNews },
-  { name: 'politics', fn: scrapePoliticsNews },
-  { name: 'world', fn: scrapeWorldNews },
-  { name: 'company-news', fn: scrapeCompanyNews },
-];
 
-cron.schedule('*/30 * * * *', async () => {
-  console.log(`Starting scheduled news refresh at ${new Date()}`);
-  for (const category of refreshCategories) {
-    for (let page = 1; page <= MAX_PAGES; page++) {
-      try {
-        const data = await category.fn(page);
-        console.log(`Refreshed category "${category.name}" page ${page} with ${data.newsItems.length} items`);
-      } catch (err) {
-        console.error(`Error refreshing category "${category.name}" page ${page}:`, err);
-      }
-    }
-  }
-  console.log(`Scheduled news refresh completed at ${new Date()}`);
-});
+// --- REMOVED: The old news scraping cron job is no longer needed ---
+// We are now fetching news on-demand from the TradingView API.
 
 // Background Graph Cache Warmer (Every Hour at the 15-minute mark)
 cron.schedule('15 * * * *', () => {
